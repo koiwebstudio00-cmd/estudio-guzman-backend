@@ -1,0 +1,796 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum ContactKind {
+  PERSON
+  ORGANIZATION
+}
+
+enum ContactCategoryType {
+  CLIENT
+  LAWYER
+  COMPANY
+  REPRESENTATIVE
+  EXPERT
+  WITNESS
+  JUDICIAL_CONTACT
+  POLICE
+  OTHER
+}
+
+enum ContactChannelType {
+  EMAIL
+  PHONE
+  WHATSAPP
+  OTHER
+}
+
+enum AddressType {
+  HOME
+  WORK
+  LEGAL
+  OTHER
+}
+
+enum CaseType {
+  LABOR
+  CIVIL_COMMERCIAL
+  CRIMINAL
+  FAMILY
+  OTHER
+}
+
+enum CaseStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+  ARCHIVED
+}
+
+enum ParticipantRole {
+  CLIENT
+  CLAIMANT
+  DEFENDANT
+  THIRD_PARTY
+  COMPLAINANT
+  ACCUSED
+  VICTIM
+  EXPERT
+  WITNESS
+  OTHER
+}
+
+enum PartySide {
+  OUR_SIDE
+  COUNTERPART
+  NEUTRAL
+}
+
+enum RepresentationType {
+  ATTORNEY
+  LEGAL_REPRESENTATIVE
+  POWER_OF_ATTORNEY
+  OTHER
+}
+
+enum CaseTeamRole {
+  PRIMARY
+  COLLABORATOR
+}
+
+enum SubCaseType {
+  EVIDENCE
+  INCIDENT
+}
+
+enum SubCaseStatus {
+  ACTIVE
+  RESOLVED
+  CLOSED
+}
+
+enum ActionType {
+  CLAIM
+  ANSWER
+  NOTICE
+  DECREE
+  RESOLUTION
+  FILING
+  OFFICIAL_LETTER
+  NOTIFICATION
+  OTHER
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum DocumentCategory {
+  PLEADING
+  COURT_ORDER
+  EVIDENCE
+  NOTICE
+  POWER_OF_ATTORNEY
+  IDENTITY
+  INTERNAL
+  OTHER
+}
+
+enum MalwareScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+  SKIPPED
+}
+
+enum FeedbackStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique @db.VarChar(50)
+  name        String           @db.VarChar(100)
+  description String?
+  isSystem    Boolean          @default(false) @map("is_system")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique @db.VarChar(100)
+  description String?
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id                     String                  @id @default(uuid()) @db.Uuid
+  email                  String                  @db.VarChar(320)
+  emailNormalized        String                  @unique @map("email_normalized") @db.VarChar(320)
+  passwordHash           String                  @map("password_hash")
+  name                   String                  @db.VarChar(160)
+  avatarUrl              String?                 @map("avatar_url")
+  status                 UserStatus              @default(ACTIVE)
+  roleId                 String                  @map("role_id") @db.Uuid
+  failedLoginCount       Int                     @default(0) @map("failed_login_count")
+  lockedUntil            DateTime?               @map("locked_until") @db.Timestamptz(3)
+  lastLoginAt            DateTime?               @map("last_login_at") @db.Timestamptz(3)
+  passwordChangedAt      DateTime?               @map("password_changed_at") @db.Timestamptz(3)
+  version                Int                     @default(1)
+  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  role                   Role                    @relation(fields: [roleId], references: [id])
+  sessions               Session[]
+  passwordResetTokens    PasswordResetToken[]
+  createdContacts        Contact[]               @relation("ContactCreatedBy")
+  createdCases           LegalCase[]             @relation("CaseCreatedBy")
+  caseMemberships        CaseTeamMember[]        @relation("CaseTeamUser")
+  caseAssignmentsMade    CaseTeamMember[]        @relation("CaseTeamAssignedBy")
+  caseStatusChanges      CaseStatusHistory[]     @relation("CaseStatusChangedBy")
+  createdSubCases        SubCase[]               @relation("SubCaseCreatedBy")
+  uploadedActions        CaseAction[]            @relation("ActionUploadedBy")
+  presentedActions       CaseAction[]            @relation("ActionPresentedBy")
+  createdTasks           Task[]                  @relation("TaskCreatedBy")
+  taskAssignments        TaskAssignment[]        @relation("TaskAssignedUser")
+  taskAssignmentsMade    TaskAssignment[]        @relation("TaskAssignedBy")
+  taskStatusChanges      TaskStatusHistory[]     @relation("TaskStatusChangedBy")
+  taskComments           TaskComment[]           @relation("TaskCommentAuthor")
+  notes                  Note[]                  @relation("NoteAuthor")
+  createdDocuments       Document[]              @relation("DocumentCreatedBy")
+  documentVersions       DocumentVersion[]       @relation("DocumentVersionCreatedBy")
+  auditLogs              AuditLog[]              @relation("AuditActor")
+  notifications          Notification[]
+  notificationPreference NotificationPreference?
+  feedbackSubmitted      Feedback[]              @relation("FeedbackSubmittedBy")
+  feedbackResolved       Feedback[]              @relation("FeedbackResolvedBy")
+
+  @@index([roleId, status])
+  @@map("users")
+}
+
+model Session {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  tokenHash      String    @unique @map("token_hash") @db.VarChar(64)
+  csrfSecretHash String    @map("csrf_secret_hash") @db.VarChar(64)
+  ipAddress      String?   @map("ip_address") @db.Inet
+  userAgent      String?   @map("user_agent")
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(3)
+  lastSeenAt     DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Contact {
+  id                       String               @id @default(uuid()) @db.Uuid
+  kind                     ContactKind
+  displayName              String               @map("display_name") @db.VarChar(240)
+  displayNameNormalized    String               @map("display_name_normalized") @db.VarChar(240)
+  firstName                String?              @map("first_name") @db.VarChar(120)
+  lastName                 String?              @map("last_name") @db.VarChar(120)
+  legalName                String?              @map("legal_name") @db.VarChar(240)
+  documentNumber           String?              @map("document_number") @db.VarChar(40)
+  documentNumberNormalized String?              @unique @map("document_number_normalized") @db.VarChar(40)
+  taxId                    String?              @map("tax_id") @db.VarChar(40)
+  taxIdNormalized          String?              @unique @map("tax_id_normalized") @db.VarChar(40)
+  notes                    String?
+  version                  Int                  @default(1)
+  createdById              String               @map("created_by_id") @db.Uuid
+  createdAt                DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt                DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  createdBy                User                 @relation("ContactCreatedBy", fields: [createdById], references: [id])
+  categories               ContactCategory[]
+  channels                 ContactChannel[]
+  addresses                ContactAddress[]
+  caseParticipations       CaseParticipant[]
+  representations          CaseRepresentation[]
+  notesRelations           Note[]
+
+  @@index([displayNameNormalized])
+  @@index([kind, deletedAt])
+  @@map("contacts")
+}
+
+model ContactCategory {
+  contactId String              @map("contact_id") @db.Uuid
+  type      ContactCategoryType
+  contact   Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, type])
+  @@map("contact_categories")
+}
+
+model ContactChannel {
+  id              String             @id @default(uuid()) @db.Uuid
+  contactId       String             @map("contact_id") @db.Uuid
+  type            ContactChannelType
+  label           String?            @db.VarChar(80)
+  value           String             @db.VarChar(320)
+  valueNormalized String             @map("value_normalized") @db.VarChar(320)
+  isPrimary       Boolean            @default(false) @map("is_primary")
+  sortOrder       Int                @default(0) @map("sort_order")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  contact         Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, type, valueNormalized])
+  @@index([valueNormalized])
+  @@map("contact_channels")
+}
+
+model ContactAddress {
+  id         String      @id @default(uuid()) @db.Uuid
+  contactId  String      @map("contact_id") @db.Uuid
+  type       AddressType @default(OTHER)
+  label      String?     @db.VarChar(80)
+  line1      String      @db.VarChar(240)
+  line2      String?     @db.VarChar(240)
+  city       String?     @db.VarChar(120)
+  province   String?     @db.VarChar(120)
+  postalCode String?     @map("postal_code") @db.VarChar(30)
+  country    String      @default("AR") @db.Char(2)
+  isPrimary  Boolean     @default(false) @map("is_primary")
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  contact    Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, isPrimary])
+  @@map("contact_addresses")
+}
+
+model Court {
+  id             String                  @id @default(uuid()) @db.Uuid
+  name           String                  @db.VarChar(240)
+  nameNormalized String                  @map("name_normalized") @db.VarChar(240)
+  jurisdiction   String?                 @db.VarChar(160)
+  address        String?
+  isActive       Boolean                 @default(true) @map("is_active")
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  cases          LegalCase[]
+  offices        CourtManagementOffice[]
+
+  @@index([nameNormalized])
+  @@map("courts")
+}
+
+model ManagementOffice {
+  id             String                  @id @default(uuid()) @db.Uuid
+  name           String                  @db.VarChar(240)
+  nameNormalized String                  @map("name_normalized") @db.VarChar(240)
+  address        String?
+  isActive       Boolean                 @default(true) @map("is_active")
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  cases          LegalCase[]
+  courts         CourtManagementOffice[]
+
+  @@index([nameNormalized])
+  @@map("management_offices")
+}
+
+model CourtManagementOffice {
+  courtId            String           @map("court_id") @db.Uuid
+  managementOfficeId String           @map("management_office_id") @db.Uuid
+  court              Court            @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  managementOffice   ManagementOffice @relation(fields: [managementOfficeId], references: [id], onDelete: Cascade)
+
+  @@id([courtId, managementOfficeId])
+  @@map("court_management_offices")
+}
+
+model LegalCase {
+  id                   String               @id @default(uuid()) @db.Uuid
+  caseNumber           String               @map("case_number") @db.VarChar(100)
+  caseNumberNormalized String               @map("case_number_normalized") @db.VarChar(100)
+  title                String               @db.VarChar(500)
+  type                 CaseType
+  status               CaseStatus           @default(PENDING)
+  startDate            DateTime             @map("start_date") @db.Date
+  closedOn             DateTime?            @map("closed_on") @db.Date
+  archivedOn           DateTime?            @map("archived_on") @db.Date
+  courtId              String?              @map("court_id") @db.Uuid
+  managementOfficeId   String?              @map("management_office_id") @db.Uuid
+  createdById          String               @map("created_by_id") @db.Uuid
+  version              Int                  @default(1)
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt            DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  court                Court?               @relation(fields: [courtId], references: [id])
+  managementOffice     ManagementOffice?    @relation(fields: [managementOfficeId], references: [id])
+  createdBy            User                 @relation("CaseCreatedBy", fields: [createdById], references: [id])
+  participants         CaseParticipant[]
+  representations      CaseRepresentation[]
+  teamMembers          CaseTeamMember[]
+  statusHistory        CaseStatusHistory[]
+  subCases             SubCase[]
+  actions              CaseAction[]
+  tasks                Task[]
+  notes                Note[]
+  documents            Document[]
+
+  @@index([caseNumberNormalized])
+  @@index([status, updatedAt(sort: Desc)])
+  @@index([type, status])
+  @@index([courtId])
+  @@index([managementOfficeId])
+  @@map("legal_cases")
+}
+
+model CaseParticipant {
+  id          String               @id @default(uuid()) @db.Uuid
+  caseId      String               @map("case_id") @db.Uuid
+  contactId   String               @map("contact_id") @db.Uuid
+  role        ParticipantRole
+  side        PartySide            @default(NEUTRAL)
+  isClient    Boolean              @default(false) @map("is_client")
+  label       String?              @db.VarChar(120)
+  notes       String?
+  sortOrder   Int                  @default(0) @map("sort_order")
+  activeFrom  DateTime?            @map("active_from") @db.Date
+  activeUntil DateTime?            @map("active_until") @db.Date
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  legalCase   LegalCase            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  contact     Contact              @relation(fields: [contactId], references: [id])
+  represented CaseRepresentation[]
+
+  @@unique([caseId, contactId, role])
+  @@index([contactId])
+  @@index([caseId, side, sortOrder])
+  @@map("case_participants")
+}
+
+model CaseRepresentation {
+  id                       String             @id @default(uuid()) @db.Uuid
+  caseId                   String             @map("case_id") @db.Uuid
+  representedParticipantId String             @map("represented_participant_id") @db.Uuid
+  representativeContactId  String             @map("representative_contact_id") @db.Uuid
+  type                     RepresentationType
+  isPrimary                Boolean            @default(false) @map("is_primary")
+  activeFrom               DateTime?          @map("active_from") @db.Date
+  activeUntil              DateTime?          @map("active_until") @db.Date
+  notes                    String?
+  createdAt                DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  legalCase                LegalCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  representedParticipant   CaseParticipant    @relation(fields: [representedParticipantId], references: [id], onDelete: Cascade)
+  representativeContact    Contact            @relation(fields: [representativeContactId], references: [id])
+
+  @@index([caseId])
+  @@index([representedParticipantId, activeUntil])
+  @@index([representativeContactId])
+  @@map("case_representations")
+}
+
+model CaseTeamMember {
+  id           String       @id @default(uuid()) @db.Uuid
+  caseId       String       @map("case_id") @db.Uuid
+  userId       String       @map("user_id") @db.Uuid
+  role         CaseTeamRole
+  assignedById String       @map("assigned_by_id") @db.Uuid
+  assignedAt   DateTime     @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  unassignedAt DateTime?    @map("unassigned_at") @db.Timestamptz(3)
+  legalCase    LegalCase    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user         User         @relation("CaseTeamUser", fields: [userId], references: [id])
+  assignedBy   User         @relation("CaseTeamAssignedBy", fields: [assignedById], references: [id])
+
+  @@index([caseId, role, unassignedAt])
+  @@index([userId, unassignedAt])
+  @@map("case_team_members")
+}
+
+model CaseStatusHistory {
+  id          String      @id @default(uuid()) @db.Uuid
+  caseId      String      @map("case_id") @db.Uuid
+  fromStatus  CaseStatus? @map("from_status")
+  toStatus    CaseStatus  @map("to_status")
+  reason      String?
+  changedById String      @map("changed_by_id") @db.Uuid
+  changedAt   DateTime    @default(now()) @map("changed_at") @db.Timestamptz(3)
+  legalCase   LegalCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  changedBy   User        @relation("CaseStatusChangedBy", fields: [changedById], references: [id])
+
+  @@index([caseId, changedAt(sort: Desc)])
+  @@map("case_status_history")
+}
+
+model SubCase {
+  id          String        @id @default(uuid()) @db.Uuid
+  caseId      String        @map("case_id") @db.Uuid
+  type        SubCaseType
+  title       String        @db.VarChar(240)
+  description String?
+  status      SubCaseStatus @default(ACTIVE)
+  openedOn    DateTime      @default(now()) @map("opened_on") @db.Date
+  closedOn    DateTime?     @map("closed_on") @db.Date
+  createdById String        @map("created_by_id") @db.Uuid
+  version     Int           @default(1)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz(3)
+  legalCase   LegalCase     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy   User          @relation("SubCaseCreatedBy", fields: [createdById], references: [id])
+  actions     CaseAction[]
+  tasks       Task[]
+  notes       Note[]
+  documents   Document[]
+
+  @@index([caseId, type, status])
+  @@map("sub_cases")
+}
+
+model CaseAction {
+  id             String     @id @default(uuid()) @db.Uuid
+  caseId         String     @map("case_id") @db.Uuid
+  subCaseId      String?    @map("sub_case_id") @db.Uuid
+  title          String     @db.VarChar(300)
+  type           ActionType
+  documentAt     DateTime   @map("document_at") @db.Timestamptz(3)
+  presentationAt DateTime?  @map("presentation_at") @db.Timestamptz(3)
+  registeredAt   DateTime   @default(now()) @map("registered_at") @db.Timestamptz(3)
+  uploadedById   String     @map("uploaded_by_id") @db.Uuid
+  presentedById  String?    @map("presented_by_id") @db.Uuid
+  description    String?
+  version        Int        @default(1)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  legalCase      LegalCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  subCase        SubCase?   @relation(fields: [subCaseId], references: [id])
+  uploadedBy     User       @relation("ActionUploadedBy", fields: [uploadedById], references: [id])
+  presentedBy    User?      @relation("ActionPresentedBy", fields: [presentedById], references: [id])
+  documents      Document[]
+
+  @@index([caseId, documentAt(sort: Desc)])
+  @@index([subCaseId, documentAt(sort: Desc)])
+  @@index([type])
+  @@map("case_actions")
+}
+
+model Task {
+  id          String              @id @default(uuid()) @db.Uuid
+  title       String              @db.VarChar(300)
+  description String?
+  status      TaskStatus          @default(PENDING)
+  priority    TaskPriority        @default(MEDIUM)
+  dueDate     DateTime?           @map("due_date") @db.Date
+  completedAt DateTime?           @map("completed_at") @db.Timestamptz(3)
+  caseId      String?             @map("case_id") @db.Uuid
+  subCaseId   String?             @map("sub_case_id") @db.Uuid
+  createdById String              @map("created_by_id") @db.Uuid
+  version     Int                 @default(1)
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?           @map("deleted_at") @db.Timestamptz(3)
+  legalCase   LegalCase?          @relation(fields: [caseId], references: [id])
+  subCase     SubCase?            @relation(fields: [subCaseId], references: [id])
+  createdBy   User                @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  assignments TaskAssignment[]
+  history     TaskStatusHistory[]
+  comments    TaskComment[]
+  documents   Document[]
+
+  @@index([status, dueDate])
+  @@index([caseId, status])
+  @@index([subCaseId, status])
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  taskId       String    @map("task_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  assignedById String    @map("assigned_by_id") @db.Uuid
+  assignedAt   DateTime  @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  unassignedAt DateTime? @map("unassigned_at") @db.Timestamptz(3)
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user         User      @relation("TaskAssignedUser", fields: [userId], references: [id])
+  assignedBy   User      @relation("TaskAssignedBy", fields: [assignedById], references: [id])
+
+  @@index([taskId, unassignedAt])
+  @@index([userId, unassignedAt])
+  @@map("task_assignments")
+}
+
+model TaskStatusHistory {
+  id          String      @id @default(uuid()) @db.Uuid
+  taskId      String      @map("task_id") @db.Uuid
+  fromStatus  TaskStatus? @map("from_status")
+  toStatus    TaskStatus  @map("to_status")
+  reason      String?
+  changedById String      @map("changed_by_id") @db.Uuid
+  changedAt   DateTime    @default(now()) @map("changed_at") @db.Timestamptz(3)
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  changedBy   User        @relation("TaskStatusChangedBy", fields: [changedById], references: [id])
+
+  @@index([taskId, changedAt(sort: Desc)])
+  @@map("task_status_history")
+}
+
+model TaskComment {
+  id        String    @id @default(uuid()) @db.Uuid
+  taskId    String    @map("task_id") @db.Uuid
+  authorId  String    @map("author_id") @db.Uuid
+  content   String
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User      @relation("TaskCommentAuthor", fields: [authorId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@map("task_comments")
+}
+
+model Note {
+  id        String     @id @default(uuid()) @db.Uuid
+  content   String
+  authorId  String     @map("author_id") @db.Uuid
+  caseId    String?    @map("case_id") @db.Uuid
+  subCaseId String?    @map("sub_case_id") @db.Uuid
+  contactId String?    @map("contact_id") @db.Uuid
+  version   Int        @default(1)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  author    User       @relation("NoteAuthor", fields: [authorId], references: [id])
+  legalCase LegalCase? @relation(fields: [caseId], references: [id])
+  subCase   SubCase?   @relation(fields: [subCaseId], references: [id])
+  contact   Contact?   @relation(fields: [contactId], references: [id])
+  documents Document[]
+
+  @@index([caseId, createdAt(sort: Desc)])
+  @@index([subCaseId, createdAt(sort: Desc)])
+  @@index([contactId, createdAt(sort: Desc)])
+  @@map("notes")
+}
+
+model Document {
+  id          String            @id @default(uuid()) @db.Uuid
+  title       String            @db.VarChar(300)
+  category    DocumentCategory  @default(OTHER)
+  description String?
+  caseId      String?           @map("case_id") @db.Uuid
+  subCaseId   String?           @map("sub_case_id") @db.Uuid
+  actionId    String?           @map("action_id") @db.Uuid
+  taskId      String?           @map("task_id") @db.Uuid
+  noteId      String?           @map("note_id") @db.Uuid
+  createdById String            @map("created_by_id") @db.Uuid
+  version     Int               @default(1)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(3)
+  legalCase   LegalCase?        @relation(fields: [caseId], references: [id])
+  subCase     SubCase?          @relation(fields: [subCaseId], references: [id])
+  action      CaseAction?       @relation(fields: [actionId], references: [id])
+  task        Task?             @relation(fields: [taskId], references: [id])
+  note        Note?             @relation(fields: [noteId], references: [id])
+  createdBy   User              @relation("DocumentCreatedBy", fields: [createdById], references: [id])
+  versions    DocumentVersion[]
+
+  @@index([caseId, createdAt(sort: Desc)])
+  @@index([subCaseId])
+  @@index([actionId])
+  @@index([taskId])
+  @@index([noteId])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id            String            @id @default(uuid()) @db.Uuid
+  documentId    String            @map("document_id") @db.Uuid
+  versionNumber Int               @map("version_number")
+  storageKey    String            @unique @map("storage_key") @db.VarChar(512)
+  originalName  String            @map("original_name") @db.VarChar(255)
+  mimeType      String            @map("mime_type") @db.VarChar(160)
+  sizeBytes     BigInt            @map("size_bytes")
+  sha256        String            @db.VarChar(64)
+  scanStatus    MalwareScanStatus @default(PENDING) @map("scan_status")
+  scannedAt     DateTime?         @map("scanned_at") @db.Timestamptz(3)
+  createdById   String            @map("created_by_id") @db.Uuid
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  document      Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy     User              @relation("DocumentVersionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, createdAt(sort: Desc)])
+  @@index([sha256])
+  @@map("document_versions")
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(120)
+  entityType String   @map("entity_type") @db.VarChar(80)
+  entityId   String?  @map("entity_id") @db.Uuid
+  before     Json?
+  after      Json?
+  metadata   Json?
+  requestId  String?  @map("request_id") @db.Uuid
+  ipAddress  String?  @map("ip_address") @db.Inet
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([requestId])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  type       String    @db.VarChar(80)
+  title      String    @db.VarChar(200)
+  body       String?
+  entityType String?   @map("entity_type") @db.VarChar(80)
+  entityId   String?   @map("entity_id") @db.Uuid
+  readAt     DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @unique @map("user_id") @db.Uuid
+  taskAssigned      Boolean  @default(true) @map("task_assigned")
+  taskDueSoon       Boolean  @default(true) @map("task_due_soon")
+  taskOverdue       Boolean  @default(true) @map("task_overdue")
+  caseStatusChanged Boolean  @default(true) @map("case_status_changed")
+  emailEnabled      Boolean  @default(false) @map("email_enabled")
+  dueSoonLeadDays   Int      @default(1) @map("due_soon_lead_days")
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model Feedback {
+  id            String         @id @default(uuid()) @db.Uuid
+  message       String
+  status        FeedbackStatus @default(OPEN)
+  submittedById String?        @map("submitted_by_id") @db.Uuid
+  resolvedById  String?        @map("resolved_by_id") @db.Uuid
+  resolution    String?
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  resolvedAt    DateTime?      @map("resolved_at") @db.Timestamptz(3)
+  submittedBy   User?          @relation("FeedbackSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  resolvedBy    User?          @relation("FeedbackResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("feedback")
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  type          String       @db.VarChar(120)
+  aggregateType String?      @map("aggregate_type") @db.VarChar(80)
+  aggregateId   String?      @map("aggregate_id") @db.Uuid
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  availableAt   DateTime     @default(now()) @map("available_at") @db.Timestamptz(3)
+  lockedAt      DateTime?    @map("locked_at") @db.Timestamptz(3)
+  processedAt   DateTime?    @map("processed_at") @db.Timestamptz(3)
+  lastError     String?      @map("last_error")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}

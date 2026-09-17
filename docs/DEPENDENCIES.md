@@ -78,7 +78,9 @@ No se incorpora una dependencia sólo por conveniencia si Node, Express, Prisma 
 | `npm run db:migrate` | crear/aplicar migración de desarrollo |
 | `npm run db:migrate:create` | crear SQL sin aplicar, para revisión |
 | `npm run db:deploy` | aplicar migraciones existentes en release |
+| `npm run db:grant-runtime` | refrescar DML runtime y revocar tablas protegidas |
 | `npm run seed` | roles y permisos idempotentes |
+| `npm run bootstrap:admin` | crear una sola vez el primer Jefe, sin password por defecto |
 
 ## Variables de entorno
 
@@ -100,19 +102,27 @@ No se incorpora una dependencia sólo por conveniencia si Node, Express, Prisma 
 | `SESSION_IDLE_MINUTES` | no | `480` | ventana inactiva, 15–43200 |
 | `STORAGE_ROOT` | no | `./storage` | raíz privada; absoluta en producción |
 | `MAX_FILE_SIZE_MB` | no | `50` | límite configurable, 1–500 |
+| `BOOTSTRAP_ADMIN_EMAIL` | bootstrap | — | email normalizado del primer administrador |
+| `BOOTSTRAP_ADMIN_NAME` | bootstrap | — | nombre visible del primer administrador |
+| `BOOTSTRAP_ADMIN_PASSWORD` | bootstrap | — | secreto efímero de 14–200 caracteres; nunca se registra |
 
 La aplicación falla al arrancar si falta `DATABASE_URL`, si producción no define CORS, si las cookies no son seguras o si el storage productivo no es absoluto. `SameSite=None` exige `Secure`.
 
 ## Instalación y desarrollo
 
 ```bash
+brew services start postgresql@17
+createdb estudio_guzman
 cp .env.example .env
-docker compose up -d db
 npm install
 npm run db:generate
 npm run db:validate
+npm run db:deploy
+npm run seed
 npm run dev
 ```
+
+En macOS se recomienda la configuración nativa y sin contraseña documentada en `LOCAL_DATABASE.md`. Docker queda como alternativa para probar el aislamiento de roles y una base descartable.
 
 Antes de integrar un cambio:
 

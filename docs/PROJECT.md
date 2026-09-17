@@ -24,7 +24,7 @@ Es una aplicación **single-tenant**: existe una única organización y no se ag
 | Abogada | expedientes, partes, actuaciones, documentos, tareas y notas |
 | Secretaria | contactos, actuaciones, documentos, tareas y operación diaria |
 
-Los servicios no autorizan por el nombre del rol. Evalúan permisos atómicos como `cases.read`, `cases.write`, `documents.read` o `users.manage`. Los roles sólo agrupan permisos.
+Los servicios no autorizan por el nombre del rol. Evalúan permisos atómicos como `cases.read`, `cases.create`, `cases.change_status`, `documents.read` o `users.manage`. Los roles sólo agrupan permisos.
 
 ## Módulos de dominio
 
@@ -32,7 +32,7 @@ Los servicios no autorizan por el nombre del rol. Evalúan permisos atómicos co
 |---|---|---|
 | Health | liveness de proceso y readiness de DB/storage | implementado |
 | Auth | login, logout, recuperación, CSRF y sesiones | diseñado |
-| Users/RBAC | equipo, roles, permisos y estado de usuario | diseñado; seed inicial implementado |
+| Users/RBAC | equipo, roles, permisos y estado de usuario | diseñado; seed granular y bootstrap implementados |
 | Contacts | personas/organizaciones, categorías, canales y domicilios | diseñado |
 | Cases | expedientes, radicación, estado, partes y equipo interno | diseñado |
 | Subcases | cuadernos de prueba e incidentes | diseñado |
@@ -120,13 +120,18 @@ El worker usará `FOR UPDATE SKIP LOCKED` para reclamar trabajos. No se inicia d
 
 ## Estado actual
 
-Implementado: scaffolding, configuración validada, servidor Express, logging, errores, health checks, conexión Prisma 7, esquema de datos, seed RBAC, adapter local base, Docker/Compose y tests iniciales.
+Implementado: scaffolding, configuración validada, servidor Express, logging, errores, health checks, conexión Prisma 7, migración inicial con constraints, seed RBAC idempotente, roles PostgreSQL separados, bootstrap del primer administrador, adapter local base, Docker/Compose y tests iniciales.
 
-Pendiente inmediato: primera migración revisada, autenticación, autorización, bootstrap del administrador, auditoría transaccional y pruebas de integración con PostgreSQL real.
+Pendiente inmediato: harness de integración/CI, autenticación, autorización y auditoría transaccional.
 
 ## Documentos relacionados
 
 - `ARCHITECTURE.md`: capas, estructura, middlewares y servicios.
 - `API.md`: convenciones y catálogo de endpoints.
 - `DEPENDENCIES.md`: paquetes, versiones, scripts y configuración.
+- `DATABASE_OPERATIONS.md`: provisión, roles, migraciones, seed, bootstrap y restauración.
 - `IMPLEMENTATION_PLAN.md`: orden incremental, pruebas y criterios de salida.
+- `decisions/PHASE_0.md`: registro de decisiones funcionales antes de la primera migración.
+- `decisions/RBAC_MATRIX.md`: permisos aprobados por rol.
+- `decisions/STATE_TRANSITIONS.md`: máquinas de estado de negocio.
+- `decisions/DATA_POLICY.md`: clasificación, archivos, retención y recuperación.

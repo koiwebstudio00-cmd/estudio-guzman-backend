@@ -27,10 +27,15 @@ backend/
     ARCHITECTURE.md
     API.md
     DEPENDENCIES.md
+    LOCAL_DATABASE.md
+    DATABASE_OPERATIONS.md
   prisma/
     migrations/
+    operations/
     schema.prisma
     seed.ts
+  scripts/
+    bootstrap-admin.ts
   src/
     app.ts
     server.ts

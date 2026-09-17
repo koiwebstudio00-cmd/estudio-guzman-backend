@@ -10,14 +10,14 @@ Ya disponible:
 
 - análisis funcional del frontend y contrato objetivo de API;
 - arquitectura Node.js 22, Express 5, TypeScript y Prisma 7;
-- schema relacional inicial;
+- schema relacional y migración inicial reproducible;
 - configuración por entorno, logging, RFC 7807 y health checks;
 - adapter base de storage local;
-- seed inicial de roles/permisos;
+- seed granular/idempotente, roles PostgreSQL separados y bootstrap inicial;
 - Docker/Compose de desarrollo;
 - lint, typecheck, build y tests iniciales.
 
-Pendiente crítico: validar reglas del estudio, crear la migración inicial, implementar autenticación/RBAC y reemplazar gradualmente los mocks del frontend.
+Pendiente crítico: crear el harness de integración/CI, implementar autenticación/RBAC y reemplazar gradualmente los mocks del frontend.
 
 ## Secuencia de dependencias
 
@@ -57,6 +57,8 @@ Cada incremento sigue este orden:
 
 ## Iteración 0 — Decisiones funcionales y baseline
 
+Estado: **completada el 2026-09-17**. Baseline aprobado en `docs/decisions/`.
+
 ### Objetivo
 
 Cerrar decisiones que impactan constraints, permisos y retención antes de congelar la primera migración.
@@ -91,6 +93,8 @@ No aplica código de dominio; cada regla debe expresarse como ejemplo aceptado/r
 El estudio aprueba las reglas P0 o acepta explícitamente defaults documentados para poder crear la migración.
 
 ## Iteración 1 — PostgreSQL y migración inicial reproducible
+
+Estado: **completada el 2026-09-17**.
 
 ### Backend/infraestructura
 

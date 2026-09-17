@@ -12,7 +12,13 @@ Administra autenticación/RBAC, equipo, contactos, expedientes, partes, actuacio
 | [Arquitectura](docs/ARCHITECTURE.md) | estructura, capas, middlewares, servicios, seguridad, worker y tests |
 | [Contrato HTTP](docs/API.md) | convenciones y catálogo completo de rutas actuales/planificadas |
 | [Dependencias y operación](docs/DEPENDENCIES.md) | paquetes/versiones, scripts, variables, Docker y auditoría |
+| [Base de datos local](docs/LOCAL_DATABASE.md) | guía rápida para levantar PostgreSQL y preparar el entorno |
+| [Operación de PostgreSQL](docs/DATABASE_OPERATIONS.md) | roles, provisión, migraciones, seed, bootstrap y restauración |
 | [Plan de implementación](docs/IMPLEMENTATION_PLAN.md) | iteraciones, dependencias, pruebas y criterios de salida |
+| [Decisiones de Fase 0](docs/decisions/PHASE_0.md) | baseline funcional aprobado y decisiones diferidas |
+| [Matriz RBAC](docs/decisions/RBAC_MATRIX.md) | permisos por rol y restricciones adicionales |
+| [Transiciones](docs/decisions/STATE_TRANSITIONS.md) | estados permitidos, efectos e invariantes |
+| [Política de datos](docs/decisions/DATA_POLICY.md) | privacidad, archivos, retención, recuperación y backups |
 | [Schema Prisma](prisma/schema.prisma) | fuente de verdad del modelo relacional |
 | [Reglas para agentes](AGENTS.md) | restricciones obligatorias al modificar el backend |
 
@@ -31,23 +37,29 @@ Implementado:
 - liveness/readiness;
 - graceful shutdown;
 - storage local base con protección contra path traversal;
-- seed inicial de roles/permisos;
+- migración inicial revisada y seed idempotente de roles/permisos;
+- bootstrap seguro y de una sola ejecución para el primer administrador;
 - Docker/Compose y tests iniciales.
 
-Próximo incremento: migración inicial, autenticación por sesiones opacas, CSRF, RBAC y bootstrap seguro del primer administrador.
+Próximo incremento: harness de integración/CI y autenticación por sesiones opacas, CSRF y RBAC.
 
 ## Inicio rápido
 
-Requisitos: Node.js 22.20 o superior y Docker/Podman para PostgreSQL local.
+Requisitos: Node.js 22.20 o superior y PostgreSQL 17. Docker/Podman es opcional.
 
 ```bash
+brew services start postgresql@17
+createdb estudio_guzman
 cp .env.example .env
-docker compose up -d db
 npm install
 npm run db:generate
 npm run db:validate
+npm run db:deploy
+npm run seed
 npm run dev
 ```
+
+Antes de ejecutar Prisma, configurar en `.env` las URLs locales indicadas en [Base de datos local](docs/LOCAL_DATABASE.md). Para el entorno simplificado con Homebrew no se ejecuta `db:grant-runtime`.
 
 API local: `http://localhost:3001/api/v1`.
 

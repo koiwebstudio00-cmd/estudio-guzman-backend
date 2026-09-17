@@ -445,7 +445,7 @@ model CaseParticipant {
   contact     Contact              @relation(fields: [contactId], references: [id])
   represented CaseRepresentation[]
 
-  @@unique([caseId, contactId, role])
+  @@index([caseId, contactId, activeUntil])
   @@index([contactId])
   @@index([caseId, side, sortOrder])
   @@map("case_participants")

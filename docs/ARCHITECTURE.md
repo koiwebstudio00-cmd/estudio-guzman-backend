@@ -29,6 +29,7 @@ backend/
     DEPENDENCIES.md
     LOCAL_DATABASE.md
     DATABASE_OPERATIONS.md
+    BRANCH_WORKFLOW.md
   prisma/
     migrations/
     operations/

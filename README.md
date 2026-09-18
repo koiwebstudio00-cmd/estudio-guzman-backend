@@ -15,6 +15,7 @@ Administra autenticación/RBAC, equipo, contactos, expedientes, partes, actuacio
 | [Base de datos local](docs/LOCAL_DATABASE.md) | guía rápida para levantar PostgreSQL y preparar el entorno |
 | [Operación de PostgreSQL](docs/DATABASE_OPERATIONS.md) | roles, provisión, migraciones, seed, bootstrap y restauración |
 | [Plan de implementación](docs/IMPLEMENTATION_PLAN.md) | iteraciones, dependencias, pruebas y criterios de salida |
+| [Flujo por fases](docs/BRANCH_WORKFLOW.md) | ramas acumulativas, commits, pruebas manuales y promoción |
 | [Decisiones de Fase 0](docs/decisions/PHASE_0.md) | baseline funcional aprobado y decisiones diferidas |
 | [Matriz RBAC](docs/decisions/RBAC_MATRIX.md) | permisos por rol y restricciones adicionales |
 | [Transiciones](docs/decisions/STATE_TRANSITIONS.md) | estados permitidos, efectos e invariantes |

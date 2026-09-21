@@ -13,7 +13,7 @@ const inputSchema = z.object({
     .max(200)
 });
 
-const databaseUrl = process.env.DATABASE_URL ?? process.env.DATABASE_URL_MIGRATE;
+const databaseUrl = process.env.DATABASE_URL_MIGRATE ?? process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("Falta DATABASE_URL o DATABASE_URL_MIGRATE.");
 
 const prisma = new PrismaClient({

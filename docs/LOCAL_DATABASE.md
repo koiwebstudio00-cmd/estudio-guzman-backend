@@ -16,9 +16,10 @@ Si ya está instalado, Homebrew informará que no hay nada que actualizar. `psql
 
 ```bash
 createdb estudio_guzman
+createdb estudio_guzman_test
 ```
 
-Si informa que la base ya existe, se puede continuar con el siguiente paso.
+`estudio_guzman` conserva los datos de desarrollo. `estudio_guzman_test` es descartable y los tests de integración eliminan su contenido. Si informa que una base ya existe, se puede continuar.
 
 ## 3. Configurar el backend
 
@@ -30,12 +31,12 @@ cp .env.example .env
 En `.env`, reemplazar las tres URLs de PostgreSQL por estas:
 
 ```dotenv
-DATABASE_URL=postgresql://localhost:5432/estudio_guzman?schema=public
-DATABASE_URL_MIGRATE=postgresql://localhost:5432/estudio_guzman?schema=public
-DATABASE_URL_TEST=postgresql://localhost:5432/estudio_guzman_test?schema=public
+DATABASE_URL=postgresql://<USUARIO_MAC>@localhost:5432/estudio_guzman?schema=public
+DATABASE_URL_MIGRATE=postgresql://<USUARIO_MAC>@localhost:5432/estudio_guzman?schema=public
+DATABASE_URL_TEST=postgresql://<USUARIO_MAC>@localhost:5432/estudio_guzman_test?schema=public
 ```
 
-Esta configuración usa el usuario actual de macOS y es sólo para desarrollo local.
+Obtener `<USUARIO_MAC>` con `whoami`. Por ejemplo, para el usuario `dev0`, la URL comienza con `postgresql://dev0@localhost`. Esta configuración es sólo para desarrollo local.
 
 ## 4. Preparar el esquema y los datos iniciales
 
@@ -47,6 +48,14 @@ npm run seed
 ```
 
 No es necesario ejecutar `npm run db:grant-runtime` con esta configuración simplificada. Ese comando corresponde al esquema de roles separados usado por Docker y producción.
+
+Validar el harness de base real:
+
+```bash
+npm run test:integration
+```
+
+Este comando aplica las migraciones y limpia repetidamente sólo `estudio_guzman_test`. Falla de forma explícita si falta `DATABASE_URL_TEST`, si coincide con la base de desarrollo o si su nombre no contiene `test`.
 
 ## 5. Crear el primer administrador
 

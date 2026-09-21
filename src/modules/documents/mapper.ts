@@ -1,0 +1,4 @@
+import type { DocumentRow } from "./repo.js";
+
+const versionDto = (value: DocumentRow["versions"][number]) => ({ id: value.id, versionNumber: value.versionNumber, originalName: value.originalName, mimeType: value.mimeType, sizeBytes: Number(value.sizeBytes), sha256: value.sha256, scanStatus: value.scanStatus, scannedAt: value.scannedAt, createdAt: value.createdAt, createdBy: value.createdBy });
+export const toDocumentDto = (value: DocumentRow) => ({ id: value.id, title: value.title, category: value.category, description: value.description, caseId: value.caseId, subCaseId: value.subCaseId, actionId: value.actionId, taskId: value.taskId, noteId: value.noteId, version: value.version, createdAt: value.createdAt, updatedAt: value.updatedAt, createdBy: value.createdBy, versions: value.versions.map(versionDto), latestVersion: value.versions[0] ? versionDto(value.versions[0]) : null });

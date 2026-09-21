@@ -5,6 +5,8 @@ Esta guía separa infraestructura, migraciones, datos estables y el primer usuar
 - `estudio_guzman_migrator`: crea y modifica objetos durante un release;
 - `estudio_guzman_app`: ejecuta API/worker con DML, sin DDL ni acceso a `_prisma_migrations`.
 
+El procedimiento automatizado para la topología actual está en `docs/DOKPLOY_DEPLOYMENT.md`. Los comandos manuales de este documento siguen siendo la referencia para una instalación directa o una recuperación operativa.
+
 Los secretos no se guardan en el repositorio, archivos de Compose ni historial de shell.
 
 ## Provisión inicial de producción

@@ -24,8 +24,24 @@ const envSchema = z
     COOKIE_DOMAIN: z.string().trim().optional(),
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
     SESSION_IDLE_MINUTES: z.coerce.number().int().min(15).max(43_200).default(480),
+    SESSION_COOKIE_NAME: z.string().trim().min(1).default("eg_session"),
+    LOGIN_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+    LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1_440).default(15),
+    LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000).default(10),
+    LOGIN_RATE_LIMIT_MINUTES: z.coerce.number().int().min(1).max(1_440).default(15),
+    UPLOAD_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000).default(20),
+    UPLOAD_RATE_LIMIT_MINUTES: z.coerce.number().int().min(1).max(1_440).default(15),
+    PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().min(5).max(1_440).default(30),
+    ARGON2_MEMORY_KIB: z.coerce.number().int().min(19_456).max(1_048_576).default(65_536),
+    ARGON2_TIME_COST: z.coerce.number().int().min(2).max(10).default(3),
+    ARGON2_PARALLELISM: z.coerce.number().int().min(1).max(16).default(1),
     STORAGE_ROOT: z.string().min(1).default("./storage"),
-    MAX_FILE_SIZE_MB: z.coerce.number().int().min(1).max(500).default(50)
+    MAX_FILE_SIZE_MB: z.coerce.number().int().min(1).max(500).default(50),
+    MALWARE_SCAN_MODE: z.enum(["skip", "clamav"]).default("skip"),
+    CLAMAV_HOST: z.string().trim().min(1).default("127.0.0.1"),
+    CLAMAV_PORT: z.coerce.number().int().min(1).max(65_535).default(3310),
+    CLAMAV_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(120_000),
+    WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(250).max(60_000).default(2_000)
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production" && !env.CORS_ORIGIN.trim()) {
@@ -55,6 +71,18 @@ const envSchema = z
         path: ["STORAGE_ROOT"],
         message: "STORAGE_ROOT debe ser absoluto en producción."
       });
+    }
+    if (env.NODE_ENV === "production" && env.MALWARE_SCAN_MODE !== "clamav") {
+      ctx.addIssue({ code: "custom", path: ["MALWARE_SCAN_MODE"], message: "MALWARE_SCAN_MODE debe ser clamav en producción." });
+    }
+    if (env.NODE_ENV === "production" && env.CORS_ORIGIN.split(",").some((origin) => !origin.trim().startsWith("https://") || origin.includes("*"))) {
+      ctx.addIssue({ code: "custom", path: ["CORS_ORIGIN"], message: "Producción requiere orígenes HTTPS explícitos, sin comodines." });
+    }
+    if (env.NODE_ENV === "production" && ["debug", "trace"].includes(env.LOG_LEVEL)) {
+      ctx.addIssue({ code: "custom", path: ["LOG_LEVEL"], message: "Producción no admite logging debug/trace." });
+    }
+    if (env.NODE_ENV === "production" && /(change-me|postgres:postgres)/i.test(`${env.DATABASE_URL} ${process.env.DATABASE_URL_MIGRATE ?? ""}`)) {
+      ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "Las credenciales de ejemplo no son válidas en producción." });
     }
   });
 

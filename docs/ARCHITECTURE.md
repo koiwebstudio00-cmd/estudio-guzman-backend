@@ -30,6 +30,10 @@ backend/
     LOCAL_DATABASE.md
     DATABASE_OPERATIONS.md
     BRANCH_WORKFLOW.md
+    phases/
+      PHASE_02.md
+      PHASE_03.md
+      PHASE_04.md
   prisma/
     migrations/
     operations/
@@ -79,8 +83,11 @@ backend/
     workers/
       outbox-worker.ts
   test/
+    api/
+    unit/
     integration/
     fixtures/
+    helpers/
 ```
 
 Dentro de cada módulo se usa sólo lo necesario:
@@ -90,7 +97,7 @@ modules/cases/
   routes.ts       # paths, métodos y composición de middlewares
   schemas.ts      # params/query/body y DTOs con Zod
   service.ts      # reglas, permisos de recurso y transacciones
-  repository.ts   # queries Prisma/SQL específicas
+  repo.ts         # queries Prisma/SQL específicas
   mapper.ts       # modelo interno → contrato público, si hace falta
   service.test.ts
   routes.test.ts
@@ -108,7 +115,14 @@ modules/cases/
 | `src/shared/logging/logger.ts` | Pino JSON, request ID, serializers y redacción |
 | `src/shared/http/errors.ts` | códigos y clase `ApiError` |
 | `src/shared/storage/local-storage.ts` | raíz privada, readiness y resolución segura de claves |
+| `src/shared/storage/malware-scanner.ts` | cliente TCP del protocolo `INSTREAM` de ClamAV, sin shell ni paths compartidos con el contenedor antivirus |
+| `src/workers/document-scan-worker.ts` | claim `SKIP LOCKED`, reintentos y estado de versiones |
+| `src/workers/notification-worker.ts` | notificaciones idempotentes, vencimientos, backoff y housekeeping |
 | `src/modules/health/routes.ts` | liveness/readiness |
+| `src/modules/auth/*` | credenciales, sesiones, cookies, recuperación, schemas y rutas |
+| `src/modules/audit/service.ts` | escritura de auditoría dentro de la transacción del caso de uso |
+| `src/modules/outbox/service.ts` | publicación transaccional de eventos para efectos posteriores |
+| `src/shared/auth/password-reset-delivery.ts` | entrega privada local de recuperación fuera de producción |
 
 `src/generated/prisma/` es generado por Prisma y no se edita manualmente.
 
@@ -135,21 +149,16 @@ modules/cases/
 | `helmet()` | 2 | headers HTTP defensivos |
 | `cors()` | 3 | origen permitido y credenciales |
 | `express.json()` | 4 | JSON con límite global de 1 MB |
-| `cookieParser()` | 5 | lectura de cookie de sesión/CSRF |
+| `cookieParser()` | 5 | lectura de cookie de sesión |
+| `authenticate` | por ruta | resolver sesión vigente, usuario, rol y permisos |
+| `csrfProtection` | mutaciones autenticadas | validar `Origin` y `x-csrf-token` en tiempo constante |
+| `validateRequest` | por ruta | validar body/params/query con Zod antes del controller |
+| `loginRateLimit` | login/recuperación | limitar intentos antes del trabajo sensible |
+| `requirePermission(code)` | rutas protegidas | exigir un permiso atómico desde el actor autenticado |
+| `uploadRateLimit` | uploads autenticados | limitar por usuario antes de recibir bytes |
+| `multipartUpload` | rutas de documentos | streaming con límite real; nunca buffer completo en memoria |
 | `notFoundHandler` | penúltimo | respuesta 404 uniforme |
 | `errorHandler` | último | Zod, `ApiError` y errores inesperados |
-
-### Planificados
-
-| Middleware | Uso |
-|---|---|
-| `authenticate` | resolver cookie opaca, sesión vigente, usuario y permisos |
-| `requirePermission(code)` | exigir permiso atómico antes del controller |
-| `csrfProtection` | comparar token/cabecera y validar `Origin` en mutaciones |
-| `validate({ params, query, body })` | producir input Zod tipado sin casts |
-| `loginRateLimit` | limitar intentos por IP y clave normalizada sin filtrar existencia |
-| `uploadRateLimit` | limitar concurrencia y frecuencia de archivos |
-| `multipartUpload` | streaming con límite real de bytes; nunca buffer sin cota |
 
 Los middlewares autentican y validan requisitos generales; la autorización sobre un recurso concreto permanece en el servicio.
 
@@ -209,9 +218,15 @@ Los middlewares autentican y validan requisitos generales; la autorización sobr
 - rotación después de login o cambio de privilegios;
 - revocación por logout, contraseña, suspensión y logout global.
 
+Implementación actual: el token de sesión usa CSPRNG y sólo se persiste como SHA-256. El token CSRF se deriva de la sesión, se persiste también hasheado y puede recuperarse después de refrescar la SPA sin exponer la cookie `HttpOnly`. Cada autenticación controla estado del usuario, revocación, expiración absoluta y ventana de inactividad, y renueva `lastSeenAt`.
+
+Los intentos fallidos incrementan el contador con una actualización SQL atómica. Al alcanzar el umbral se establece `lockedUntil`; todos los rechazos de credenciales conservan el mismo contrato externo. Un login correcto rehashea progresivamente hashes Argon2id con parámetros antiguos.
+
 ### RBAC
 
 `Role ↔ RolePermission ↔ Permission`. Las rutas exigen permisos básicos y el servicio valida el recurso. Conocer un UUID nunca concede acceso. Acciones destructivas o administrativas tienen permisos propios.
+
+`AuthorizationService` resuelve permisos efectivos cargados con la sesión y `requirePermission` corta el request antes del controller. `UserService` y `RoleService` repiten invariantes sensibles dentro de la transacción: no autoescalada, optimistic locking, último administrador efectivo y revocación inmediata. Los cambios que pueden eliminar al último administrador comparten un advisory lock PostgreSQL.
 
 ## Errores HTTP
 
@@ -245,13 +260,13 @@ No se devuelven stack traces, mensajes SQL, paths, nombres de buckets o detalles
 
 ## Storage
 
-La interfaz objetivo contiene operaciones equivalentes a `put`, `openReadStream`, `exists`, `delete` y `moveFromTemporary`. `LocalStorageService` es el adapter inicial. El dominio guarda claves opacas, nunca rutas absolutas.
+`LocalStorageService` implementa temporales privados, `moveFromTemporary`, `openReadStream`, `exists`, `size`, `delete` y cleanup de temporales. El dominio guarda claves opacas, nunca rutas absolutas. El parser multipart transmite a disco mientras calcula SHA-256 y conserva sólo ventanas pequeñas para validar cabecera, EOF y cifrado del PDF.
 
 Controles requeridos para uploads: nombre seguro para descarga, límite durante streaming, extensión, MIME detectado, SHA-256, archivo temporal, escaneo, persistencia atómica y cleanup ante fallos.
 
 ## Outbox y worker
 
-La transacción de negocio crea `OutboxEvent`. El worker:
+La transacción de negocio crea `OutboxEvent`. El worker independiente procesa `DOCUMENT_SCAN_REQUESTED`, asignaciones, vencimientos y cambios de estado. Cada handler hace claim con `FOR UPDATE SKIP LOCKED`, usa claves idempotentes y finaliza en `PROCESSED` o `FAILED` con reintentos exponenciales:
 
 1. reclama un lote con `FOR UPDATE SKIP LOCKED`;
 2. marca `PROCESSING` dentro de una transacción corta;
@@ -263,14 +278,16 @@ Los handlers deben ser idempotentes porque una entrega puede repetirse.
 
 ## Testing
 
-- unitario: normalización, permisos, transiciones y claves de storage;
-- API: contratos, Zod, errores, cookies, CSRF y rate limits;
-- integración: PostgreSQL real con migraciones, transacciones y constraints;
+- unitario (`test/unit`): normalización, permisos, transiciones y claves de storage;
+- API (`test/api`): contratos, Zod, errores, cookies, CSRF y rate limits;
+- integración (`test/integration`): PostgreSQL real con migraciones, transacciones y constraints;
 - seguridad: IDOR, acceso horizontal, path traversal y enumeración;
 - E2E: login → contacto → expediente → actuación/documento → tarea;
 - recuperación: backup y restauración ensayados en staging.
 
-No se usan datos personales reales en fixtures.
+`DATABASE_URL_TEST` es obligatoria para integración, debe apuntar a una base cuyo nombre contenga `test`, ser distinta de `DATABASE_URL` y ser local salvo habilitación explícita de CI. Antes de cada test se truncan únicamente tablas de aplicación; `_prisma_migrations` se conserva. No se usan datos personales reales en fixtures.
+
+La batería se ejecuta localmente antes de cada integración: generación y validación Prisma, análisis estático, tests, integración con PostgreSQL, build y auditoría runtime.
 
 ## Despliegue
 

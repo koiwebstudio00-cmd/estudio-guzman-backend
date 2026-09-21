@@ -1,0 +1,2 @@
+import { z } from "zod"; const day = z.string().date().transform((value) => new Date(`${value}T00:00:00.000Z`));
+export const auditQuerySchema = z.object({ entityType: z.string().trim().min(1).max(80).optional(), entityId: z.string().uuid().optional(), actorId: z.string().uuid().optional(), from: day.optional(), to: day.optional(), cursor: z.string().regex(/^\d+$/).optional(), limit: z.coerce.number().int().min(1).max(100).default(25) }).refine((value) => !value.from || !value.to || value.from <= value.to, { message: "El rango es inválido." });

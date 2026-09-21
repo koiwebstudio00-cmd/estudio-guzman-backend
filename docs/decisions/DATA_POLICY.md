@@ -64,7 +64,7 @@ Esta política es una base técnica para el MVP. Los plazos legales definitivos 
 
 - `originalName` se conserva sólo como metadata saneada para `Content-Disposition`;
 - el nombre original nunca forma parte de una ruta confiada;
-- clave opaca: `cases/<caseId>/<documentId>/<versionId>`;
+- clave opaca: `cases/<caseId>/<documentId>/<versionId>`; tareas/notas todavía sin expediente usan `documents/<documentId>/<versionId>`;
 - la API jamás devuelve `storageKey` o un path absoluto;
 - la descarga exige sesión, `documents.read` y acceso al recurso relacionado.
 
@@ -194,4 +194,5 @@ Ante sospecha de exposición:
 - El MVP acepta sólo PDF hasta 50 MB.
 - No hay purga física automática de documentos ni información jurídica.
 - Se aceptan RPO 24 h y RTO 4 h como objetivos iniciales.
-- El destino externo de backups, antivirus y proveedor de email deben elegirse antes del despliegue productivo; no bloquean el modelo ni el desarrollo de módulos.
+- ClamAV es el antivirus del despliegue inicial y sólo escucha dentro de la red privada de Compose.
+- El destino externo de backups y el proveedor de email deben elegirse antes de operar con datos reales; no bloquean el modelo ni el desarrollo de módulos.

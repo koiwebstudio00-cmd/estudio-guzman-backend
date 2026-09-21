@@ -24,4 +24,4 @@ Antes de modificar contratos o estructura, leer `docs/PROJECT.md`, `docs/ARCHITE
 
 ## Terminado
 
-Ejecutar `npm run lint`, `npm run typecheck`, `npm test` y `npm run build`. Cambios de contrato actualizan la documentación y tienen tests de validación/autorización.
+Ejecutar `npm run lint`, `npm run typecheck`, `npm test` y `npm run build`. Los cambios de persistencia ejecutan además `npm run test:integration` sobre una `DATABASE_URL_TEST` exclusiva. Cambios de contrato actualizan la documentación y tienen tests de validación/autorización.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "../src/shared/http/errors.js";
-import { LocalStorageService } from "../src/shared/storage/local-storage.js";
+import { ApiError } from "../../src/shared/http/errors.js";
+import { LocalStorageService } from "../../src/shared/storage/local-storage.js";
 
 describe("LocalStorageService", () => {
   const service = new LocalStorageService("/tmp/estudio-guzman-storage-test");
@@ -11,7 +11,7 @@ describe("LocalStorageService", () => {
     );
   });
 
-  it.each(["../outside", "/etc/passwd", "..\\outside", "\0invalid"])(
+  it.each(["../outside", "safe/../outside", "/etc/passwd", "..\\outside", "\0invalid"])(
     "rejects unsafe key %s",
     (key) => {
       expect(() => service.resolveKey(key)).toThrow(ApiError);

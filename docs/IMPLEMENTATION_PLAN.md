@@ -122,6 +122,8 @@ Una persona nueva puede levantar PostgreSQL, aplicar migraciones/seed y obtener 
 
 ## Iteración 2 — Harness de integración y CI
 
+Estado: **completada el 2026-09-18**. Entrega en `docs/phases/PHASE_02.md`.
+
 ### Backend/infraestructura
 
 - separar tests `unit`, `api` e `integration`;
@@ -147,6 +149,8 @@ Una persona nueva puede levantar PostgreSQL, aplicar migraciones/seed y obtener 
 Cada push recibe una señal reproducible y bloqueante sobre schema, tipos, comportamiento y build.
 
 ## Iteración 3 — Autenticación, sesiones y protección HTTP
+
+Estado: **completada el 2026-09-18**. Entrega en `docs/phases/PHASE_03.md`.
 
 ### Backend
 
@@ -199,6 +203,8 @@ Un administrador de prueba inicia/cierra sesión desde la SPA; refresh conserva 
 
 ## Iteración 4 — Usuarios, roles y autorización
 
+Estado: **completada el 2026-09-18**. Entrega en `docs/phases/PHASE_04.md`.
+
 ### Backend
 
 - `AuthorizationService` y `ActorContext`;
@@ -232,6 +238,8 @@ Un administrador de prueba inicia/cierra sesión desde la SPA; refresh conserva 
 La UI y la API reflejan permisos reales, y un request manual no puede eludir restricciones ocultando/mostrando botones.
 
 ## Iteración 5 — Catálogos y contactos
+
+Estado: **completada el 2026-09-19**. Entrega en `docs/phases/PHASE_05.md`.
 
 ### Backend
 
@@ -267,6 +275,8 @@ La UI y la API reflejan permisos reales, y un request manual no puede eludir res
 Se crea, busca, edita y consulta un contacto desde la SPA sin usar `localStorage` para este dominio.
 
 ## Iteración 6 — Expedientes, partes y equipo
+
+Estado: **completada el 2026-09-19**. Entrega en `docs/phases/PHASE_06.md`.
 
 ### Backend
 
@@ -305,6 +315,8 @@ Un usuario crea desde la UI un expediente con varias partes y equipo; otro usuar
 
 ## Iteración 7 — Cuadernos, actuaciones y timeline
 
+Estado: **completada el 2026-09-19**. Entrega en `docs/phases/PHASE_07.md`.
+
 ### Backend
 
 - CRUD y transiciones de cuadernos de prueba/incidentes;
@@ -335,6 +347,8 @@ Un usuario crea desde la UI un expediente con varias partes y equipo; otro usuar
 La línea de tiempo jurídica principal funciona de extremo a extremo sin datos simulados.
 
 ## Iteración 8 — Documentos y storage privado
+
+Estado: **completada el 2026-09-19**. Entrega en `docs/phases/PHASE_08.md`.
 
 ### Backend
 

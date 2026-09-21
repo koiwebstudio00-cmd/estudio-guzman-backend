@@ -28,6 +28,7 @@
 | `pino` | 10.3.1 | logger JSON estructurado |
 | `pino-http` | 11.0.0 | request logger, duración y request ID |
 | `dotenv` | 17.4.2 | carga local de `.env` |
+| `busboy` | 1.6.0 | parser multipart por streaming con límites durante la recepción |
 
 ### Argon2id en lugar de bcrypt
 
@@ -47,6 +48,7 @@ Morgan es adecuado para access logs textuales. Pino HTTP cubre el mismo evento y
 | `tsx` | 4.23.13 | desarrollo watch y scripts TS |
 | `prisma` | 7.10.0 | format, generate, migrate y deploy |
 | `vitest` | 5.0.1 | runner de tests |
+| `@vitest/coverage-v8` | 5.0.1 | cobertura orientativa con V8/LCOV |
 | `supertest` | 7.2.2 | pruebas HTTP de Express |
 | `eslint` | 10.10.0 | análisis estático |
 | `@eslint/js` | 10.0.1 | reglas base ESLint |
@@ -57,6 +59,7 @@ Morgan es adecuado para access logs textuales. Pino HTTP cubre el mismo evento y
 | `@types/cors` | 2.8.19 | tipos CORS |
 | `@types/pg` | 8.23.1 | tipos PostgreSQL |
 | `@types/supertest` | 7.2.1 | tipos de pruebas HTTP |
+| `@types/busboy` | 1.5.4 | tipos del parser multipart |
 
 No se incorpora una dependencia sólo por conveniencia si Node, Express, Prisma o Zod ya resuelven el caso de forma segura y legible.
 
@@ -65,12 +68,20 @@ No se incorpora una dependencia sólo por conveniencia si Node, Express, Prisma 
 | Script | Comando/propósito |
 |---|---|
 | `npm run dev` | API con `tsx watch` |
+| `npm run dev:worker` | worker de outbox, notificaciones, housekeeping y escaneo con `tsx watch` |
 | `npm run build` | compilar `src/` a `dist/` |
 | `npm start` | ejecutar `dist/server.js` |
+| `npm run start:worker` | ejecutar `dist/worker.js` compilado |
 | `npm run lint` | ESLint sobre el proyecto |
 | `npm run typecheck` | TypeScript sin emitir archivos |
-| `npm test` | suite Vitest una vez |
+| `npm test` | suites unitarias y API una vez |
 | `npm run test:watch` | Vitest interactivo |
+| `npm run test:unit` | tests unitarios aislados |
+| `npm run test:api` | tests HTTP sin DB real |
+| `npm run test:db:migrate` | aplicar migraciones sólo en `DATABASE_URL_TEST` validada |
+| `npm run test:integration` | migrar y probar PostgreSQL real; nunca se omite silenciosamente |
+| `npm run test:all` | tests unitarios/API e integración |
+| `npm run test:coverage` | reporte de cobertura text/LCOV sin umbral artificial |
 | `npm run audit:runtime` | auditar sin dev ni optional |
 | `npm run db:format` | formatear schema Prisma |
 | `npm run db:validate` | validar schema/config |
@@ -94,19 +105,36 @@ No se incorpora una dependencia sólo por conveniencia si Node, Express, Prisma 
 | `DATABASE_URL` | sí | — | conexión del rol de runtime |
 | `DATABASE_URL_MIGRATE` | release | — | conexión owner/migrador; Prisma CLI la prioriza si existe |
 | `DATABASE_URL_TEST` | integración | — | DB descartable exclusiva de tests |
+| `ALLOW_REMOTE_TEST_DATABASE` | no | `false` | habilita explícitamente una DB de integración no local en un ambiente controlado |
 | `CORS_ORIGIN` | producción | vacío | orígenes separados por coma |
 | `COOKIE_SECURE` | producción | `false` | debe ser `true` bajo HTTPS |
 | `COOKIE_SAMESITE` | no | `lax` | `lax`, `strict` o `none` |
 | `COOKIE_DOMAIN` | no | host actual | dominio opcional de cookie |
 | `SESSION_TTL_DAYS` | no | `30` | expiración absoluta, 1–90 |
 | `SESSION_IDLE_MINUTES` | no | `480` | ventana inactiva, 15–43200 |
+| `SESSION_COOKIE_NAME` | no | `eg_session` | nombre de la cookie opaca `HttpOnly` |
+| `LOGIN_MAX_ATTEMPTS` | no | `5` | fallos antes del bloqueo temporal |
+| `LOGIN_LOCK_MINUTES` | no | `15` | duración del bloqueo de credenciales |
+| `LOGIN_RATE_LIMIT_MAX` | no | `10` | solicitudes de login/recuperación por ventana e IP |
+| `LOGIN_RATE_LIMIT_MINUTES` | no | `15` | ventana del rate limit de autenticación |
+| `UPLOAD_RATE_LIMIT_MAX` | no | `20` | uploads por usuario y ventana |
+| `UPLOAD_RATE_LIMIT_MINUTES` | no | `15` | ventana del rate limit de archivos |
+| `PASSWORD_RESET_TTL_MINUTES` | no | `30` | validez del token de recuperación |
+| `ARGON2_MEMORY_KIB` | no | `65536` | memoria de Argon2id por hash |
+| `ARGON2_TIME_COST` | no | `3` | iteraciones de Argon2id |
+| `ARGON2_PARALLELISM` | no | `1` | paralelismo de Argon2id |
 | `STORAGE_ROOT` | no | `./storage` | raíz privada; absoluta en producción |
 | `MAX_FILE_SIZE_MB` | no | `50` | límite configurable, 1–500 |
+| `MALWARE_SCAN_MODE` | producción | `skip` | `skip` sólo local/test; `clamav` obligatorio en producción |
+| `CLAMAV_HOST` | no | `127.0.0.1` | host TCP privado del daemon ClamAV |
+| `CLAMAV_PORT` | no | `3310` | puerto TCP privado del daemon ClamAV |
+| `CLAMAV_TIMEOUT_MS` | no | `120000` | timeout completo del escaneo por streaming |
+| `WORKER_POLL_INTERVAL_MS` | no | `2000` | intervalo del worker, 250–60000 ms |
 | `BOOTSTRAP_ADMIN_EMAIL` | bootstrap | — | email normalizado del primer administrador |
 | `BOOTSTRAP_ADMIN_NAME` | bootstrap | — | nombre visible del primer administrador |
 | `BOOTSTRAP_ADMIN_PASSWORD` | bootstrap | — | secreto efímero de 14–200 caracteres; nunca se registra |
 
-La aplicación falla al arrancar si falta `DATABASE_URL`, si producción no define CORS, si las cookies no son seguras o si el storage productivo no es absoluto. `SameSite=None` exige `Secure`.
+La aplicación falla al arrancar si falta `DATABASE_URL`, si producción no define CORS, si las cookies no son seguras, si el storage productivo no es absoluto o si producción no habilita ClamAV. `SameSite=None` exige `Secure`.
 
 ## Instalación y desarrollo
 
@@ -139,6 +167,10 @@ npm run audit:runtime
 El builder instala todo para generar Prisma y compilar. La etapa final ejecuta `npm prune --omit=dev --omit=optional`; por eso no contiene TypeScript, tests, Prisma CLI ni drivers opcionales. Sí contiene el cliente generado, adapter `pg` y dependencias reales de la API.
 
 Las migraciones se ejecutan como job separado con el artefacto de build/release correspondiente. No se agrega el CLI a la API productiva para migrar al arrancar.
+
+En Dokploy, `docker-compose.prod.yml` construye ese job desde la etapa `builder`, mientras API y worker usan la etapa mínima `runner`. ClamAV corre en un contenedor separado y el worker transmite los bytes por `INSTREAM` sobre la red privada de Compose; los puertos de PostgreSQL y ClamAV nunca se publican.
+
+El contenedor ClamAV define `StreamMaxLength` en 64 MB por defecto para cubrir el máximo funcional de 50 MB. Si cambia `MAX_FILE_SIZE_MB`, se debe ajustar también `CLAMAV_STREAM_MAX_LENGTH` conservando margen.
 
 ## Auditoría y actualizaciones
 

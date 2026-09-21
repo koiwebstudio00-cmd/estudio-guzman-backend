@@ -72,8 +72,8 @@ createdb estudio_guzman_phase_test
 Configurar temporalmente en `.env`:
 
 ```dotenv
-DATABASE_URL=postgresql://localhost:5432/estudio_guzman_phase_test?schema=public
-DATABASE_URL_MIGRATE=postgresql://localhost:5432/estudio_guzman_phase_test?schema=public
+DATABASE_URL=postgresql://<USUARIO_MAC>@localhost:5432/estudio_guzman_phase_test?schema=public
+DATABASE_URL_MIGRATE=postgresql://<USUARIO_MAC>@localhost:5432/estudio_guzman_phase_test?schema=public
 ```
 
 Después seguir los comandos específicos de `docs/phases/PHASE_XX.md`. La rama más nueva representa la prueba integrada de todas las fases acumuladas.

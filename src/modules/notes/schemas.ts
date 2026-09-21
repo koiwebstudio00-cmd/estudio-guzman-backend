@@ -1,0 +1,2 @@
+import { z } from "zod"; const uuid = z.string().uuid(); const contexts = { caseId: uuid.optional(), subCaseId: uuid.optional(), contactId: uuid.optional() }; const has = (v: Record<string, unknown>) => [v.caseId, v.subCaseId, v.contactId].filter(Boolean).length === 1;
+export const listNotesSchema = z.object({ ...contexts, cursor: z.string().max(1000).optional(), limit: z.coerce.number().int().min(1).max(100).default(25) }).refine(has); export const createNoteSchema = z.object({ content: z.string().trim().min(1).max(50_000), ...contexts }).refine(has);

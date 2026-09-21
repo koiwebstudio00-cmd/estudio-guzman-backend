@@ -15,4 +15,13 @@ describe("production artifacts", () => {
     expect(compose).toContain("nc 127.0.0.1 3310");
     expect(compose).toContain("start_period: 2m");
   });
+
+  it("copies TypeScript configuration before generating the Prisma client", () => {
+    const dockerfile = readFileSync(new URL("../../Dockerfile", import.meta.url), "utf8");
+    const copyTsconfigAt = dockerfile.indexOf("COPY tsconfig.json tsconfig.build.json ./");
+    const generatePrismaAt = dockerfile.indexOf("RUN npm run db:generate");
+
+    expect(copyTsconfigAt).toBeGreaterThan(-1);
+    expect(generatePrismaAt).toBeGreaterThan(copyTsconfigAt);
+  });
 });

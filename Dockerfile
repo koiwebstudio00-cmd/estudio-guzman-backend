@@ -14,11 +14,11 @@ RUN npm ci
 
 FROM dependencies AS builder
 ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
+COPY tsconfig.json tsconfig.build.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 COPY scripts ./scripts
 RUN npm run db:generate
-COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN npm run build
 

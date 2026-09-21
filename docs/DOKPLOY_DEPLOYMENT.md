@@ -83,7 +83,7 @@ Si el bootstrap vuelve a ejecutarse cuando ya existen usuarios, falla deliberada
 ## 4. Desplegar y publicar la API
 
 1. Ejecutar **Deploy**.
-2. Confirmar que `postgres` está healthy, `migrate` terminó con código `0`, y `api`, `worker` y `clamav` permanecen activos. La primera descarga de firmas de ClamAV puede tardar varios minutos; el worker espera su healthcheck.
+2. Confirmar que `postgres` está healthy, `migrate` terminó con código `0`, y `api`, `worker` y `clamav` permanecen activos. La primera descarga de firmas de ClamAV puede tardar varios minutos; el healthcheck usa IPv4 explícito para evitar falsos negativos de `localhost` en Docker recientes y el worker espera hasta que responda.
 3. En **Domains** del Compose, agregar:
    - servicio: `api`;
    - dominio: `api-guzman.koistudio.com.ar`;

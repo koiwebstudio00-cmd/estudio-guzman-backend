@@ -3,12 +3,14 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["test/**/*.test.ts"],
+    include: ["test/{unit,api}/**/*.test.ts"],
     setupFiles: ["test/setup.ts"],
     testTimeout: 15_000,
     fileParallelism: false,
     coverage: {
-      reporter: ["text", "lcov"]
+      reporter: ["text", "lcov"],
+      include: ["src/**/*.ts"],
+      exclude: ["src/generated/**"]
     }
   }
 });

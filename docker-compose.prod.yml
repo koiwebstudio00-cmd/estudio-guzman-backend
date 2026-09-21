@@ -1,0 +1,146 @@
+name: estudio-guzman
+
+x-runtime-environment: &runtime-environment
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  PORT: 3001
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  TRUST_PROXY: ${TRUST_PROXY:-1}
+  DATABASE_URL: postgresql://estudio_guzman_app:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-estudio_guzman}?schema=public
+  CORS_ORIGIN: ${CORS_ORIGIN}
+  COOKIE_SECURE: "true"
+  COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+  COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+  SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+  SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-480}
+  SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-eg_session}
+  LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+  LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
+  LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-10}
+  LOGIN_RATE_LIMIT_MINUTES: ${LOGIN_RATE_LIMIT_MINUTES:-15}
+  UPLOAD_RATE_LIMIT_MAX: ${UPLOAD_RATE_LIMIT_MAX:-20}
+  UPLOAD_RATE_LIMIT_MINUTES: ${UPLOAD_RATE_LIMIT_MINUTES:-15}
+  PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-30}
+  ARGON2_MEMORY_KIB: ${ARGON2_MEMORY_KIB:-65536}
+  ARGON2_TIME_COST: ${ARGON2_TIME_COST:-3}
+  ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
+  STORAGE_ROOT: /data/storage
+  MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+  MALWARE_SCAN_MODE: clamav
+  CLAMAV_HOST: clamav
+  CLAMAV_PORT: 3310
+  CLAMAV_TIMEOUT_MS: ${CLAMAV_TIMEOUT_MS:-120000}
+  WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-2000}
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: deploy/postgres/Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-estudio_guzman}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL_MIGRATE: postgresql://estudio_guzman_migrator:${MIGRATOR_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-estudio_guzman}?schema=public
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      RUN_BOOTSTRAP_ADMIN: ${RUN_BOOTSTRAP_ADMIN:-false}
+    networks:
+      - backend
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        npm run db:deploy
+        npm run seed
+        npm run db:grant-runtime
+        if [ "$${RUN_BOOTSTRAP_ADMIN}" = "true" ]; then
+          npm run bootstrap:admin
+        fi
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment: *runtime-environment
+    volumes:
+      - document_storage:/data/storage
+    networks:
+      - backend
+    expose:
+      - "3001"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    command: ["node", "dist/worker.js"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
+    environment: *runtime-environment
+    healthcheck:
+      disable: true
+    volumes:
+      - document_storage:/data/storage
+    networks:
+      - backend
+
+  clamav:
+    image: ${CLAMAV_IMAGE:-clamav/clamav:stable_base}
+    restart: unless-stopped
+    environment:
+      CLAMD_CONF_StreamMaxLength: ${CLAMAV_STREAM_MAX_LENGTH:-64M}
+    volumes:
+      - clamav_database:/var/lib/clamav
+    networks:
+      - backend
+    expose:
+      - "3310"
+
+volumes:
+  postgres_data:
+  document_storage:
+  clamav_database:
+
+networks:
+  backend:
+    driver: bridge

@@ -29,6 +29,10 @@ BEGIN
     'GRANT CONNECT ON DATABASE %I TO estudio_guzman_migrator, estudio_guzman_app',
     current_database()
   );
+  EXECUTE format(
+    'GRANT CREATE ON DATABASE %I TO estudio_guzman_migrator',
+    current_database()
+  );
 END
 $$;
 

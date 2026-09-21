@@ -31,20 +31,20 @@ Los servicios no autorizan por el nombre del rol. Evalúan permisos atómicos co
 | Módulo | Responsabilidad | Estado |
 |---|---|---|
 | Health | liveness de proceso y readiness de DB/storage | implementado |
-| Auth | login, logout, recuperación, CSRF y sesiones | diseñado |
-| Users/RBAC | equipo, roles, permisos y estado de usuario | diseñado; seed granular y bootstrap implementados |
-| Contacts | personas/organizaciones, categorías, canales y domicilios | diseñado |
-| Cases | expedientes, radicación, estado, partes y equipo interno | diseñado |
-| Subcases | cuadernos de prueba e incidentes | diseñado |
-| Actions | actuaciones y línea de tiempo | diseñado |
-| Documents | metadatos, versiones, permisos y archivos privados | diseñado; adapter local base implementado |
+| Auth | login, logout, recuperación, CSRF y sesiones | implementado e integrado con la SPA |
+| Users/RBAC | equipo, roles, permisos y estado de usuario | implementado e integrado con la SPA |
+| Contacts | personas/organizaciones, categorías, canales y domicilios | implementado e integrado con la SPA |
+| Cases | expedientes, radicación, estado, partes y equipo interno | implementado e integrado con la SPA |
+| Subcases | cuadernos de prueba e incidentes | implementado e integrado con la SPA |
+| Actions | actuaciones y línea de tiempo | implementado e integrado con la SPA |
+| Documents | metadatos, versiones, permisos y archivos privados | implementado e integrado con la SPA |
 | Tasks | tareas, asignaciones, estados, comentarios y vencimientos | diseñado |
 | Notes | notas internas vinculadas a contexto | diseñado |
 | Dashboard/Search | agregados, métricas y búsqueda autorizada | diseñado |
-| Audit | registro append-only de cambios relevantes | esquema diseñado |
+| Audit | registro append-only de cambios relevantes | servicio transaccional implementado para Auth |
 | Notifications | bandeja y preferencias por usuario | esquema diseñado |
 | Feedback | sugerencias internas y resolución | esquema diseñado |
-| Outbox/Worker | efectos asíncronos, reintentos y mantenimiento | esquema diseñado |
+| Outbox/Worker | efectos asíncronos, reintentos y mantenimiento | publicación transaccional y worker de escaneo implementados; handlers de notificaciones pendientes |
 
 ## Flujos principales
 
@@ -113,16 +113,18 @@ El esquema canónico es `prisma/schema.prisma`. Sus grupos principales son:
 | API | HTTP, autenticación, autorización y reglas síncronas |
 | Worker | outbox, notificaciones, vencimientos, limpieza y escaneo |
 | PostgreSQL | datos relacionales y coordinación transaccional |
-| Reverse proxy | TLS, frontend estático y proxy `/api` |
+| Reverse proxy | TLS y publicación exclusiva de la API mediante Dokploy/Traefik |
 | Storage privado | documentos persistentes compartidos por API/worker |
+
+El frontend se despliega de forma independiente en Vercel. Producción usa `guzman.koistudio.com.ar` para la SPA y `api-guzman.koistudio.com.ar` para la API.
 
 El worker usará `FOR UPDATE SKIP LOCKED` para reclamar trabajos. No se inicia dentro del proceso HTTP.
 
 ## Estado actual
 
-Implementado: scaffolding, configuración validada, servidor Express, logging, errores, health checks, conexión Prisma 7, migración inicial con constraints, seed RBAC idempotente, roles PostgreSQL separados, bootstrap del primer administrador, adapter local base, Docker/Compose y tests iniciales.
+Implementado: scaffolding, configuración validada, servidor Express, logging, errores, health checks, conexión Prisma 7, migración inicial con constraints, seed RBAC idempotente, roles PostgreSQL separados, bootstrap del primer administrador, harness unitario/API/integración reproducible localmente, autenticación completa por sesiones opacas, usuarios/RBAC, catálogos judiciales, contactos normalizados, expedientes con partes/equipo/estados, cuadernos/incidentes, actuaciones, timeline jurídico y documentos PDF privados/versionados integrados con el frontend. El storage local realiza streaming, checksum, movimiento atómico y cleanup; el worker procesa escaneo ClamAV mediante outbox.
 
-Pendiente inmediato: harness de integración/CI, autenticación, autorización y auditoría transaccional.
+Pendiente inmediato: tareas, asignaciones, comentarios y notas en la Fase 9.
 
 ## Documentos relacionados
 

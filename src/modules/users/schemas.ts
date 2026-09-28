@@ -3,6 +3,7 @@ import { z } from "zod";
 const uuid = z.string().uuid("El identificador es inválido.");
 const email = z.string().trim().email("Ingresá un email válido.").max(320);
 const name = z.string().trim().min(2).max(160);
+const password = z.string().min(8, "La contraseña debe tener al menos 8 caracteres.").max(200);
 
 export const userIdParamsSchema = z.object({ userId: uuid });
 
@@ -12,7 +13,7 @@ export const listUsersQuerySchema = z.object({
   roleId: uuid.optional()
 });
 
-export const createUserSchema = z.object({ email, name, roleId: uuid });
+export const createUserSchema = z.object({ email, name, roleId: uuid, password });
 
 export const updateUserSchema = z
   .object({

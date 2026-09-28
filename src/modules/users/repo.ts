@@ -42,7 +42,7 @@ export class UserRepository {
 
   create(
     database: DatabaseClient,
-    data: { email: string; emailNormalized: string; name: string; roleId: string; passwordHash: string }
+    data: { email: string; emailNormalized: string; name: string; roleId: string; passwordHash: string; passwordChangedAt: Date }
   ) {
     return database.user.create({ data, include: userAuthorizationInclude });
   }

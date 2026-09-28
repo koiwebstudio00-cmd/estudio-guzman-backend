@@ -49,9 +49,37 @@ paths:
   /contacts:
     get: { responses: { '200': { description: Contactos paginados } } }
     post: { parameters: [ { $ref: '#/components/parameters/Csrf' } ], responses: { '201': { description: Contacto creado }, '400': { $ref: '#/components/responses/Problem' } } }
+  /users:
+    get: { responses: { '200': { description: Usuarios autorizados } } }
+    post:
+      parameters: [ { $ref: '#/components/parameters/Csrf' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name, roleId, password]
+              properties:
+                email: { type: string, format: email, maxLength: 320 }
+                name: { type: string, minLength: 2, maxLength: 160 }
+                roleId: { type: string, format: uuid }
+                password: { type: string, minLength: 8, maxLength: 200, writeOnly: true }
+      responses: { '201': { description: Usuario creado con contraseña inicial hasheada }, '400': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } }
   /cases:
     get: { responses: { '200': { description: Expedientes paginados } } }
-    post: { parameters: [ { $ref: '#/components/parameters/Csrf' } ], responses: { '201': { description: Expediente creado } } }
+    post:
+      parameters: [ { $ref: '#/components/parameters/Csrf' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                courtName: { type: [string, 'null'], maxLength: 240 }
+                managementOfficeName: { type: [string, 'null'], maxLength: 240 }
+      responses: { '201': { description: Expediente creado } }
   /cases/{caseId}:
     parameters: [ { $ref: '#/components/parameters/CaseId' } ]
     get: { responses: { '200': { description: Expediente completo }, '404': { $ref: '#/components/responses/Problem' } } }

@@ -83,7 +83,7 @@ por el usuario autenticado.
 | Método | Ruta | Permiso/uso |
 |---|---|---|
 | GET | `/users?status=&roleId=&cursor=` | `users.read` |
-| POST | `/users` | `users.manage`; crear/invitar |
+| POST | `/users` | `users.manage`; crear con contraseña inicial |
 | GET | `/users/:userId` | `users.read` |
 | PATCH | `/users/:userId` | `users.manage`; perfil, rol o estado |
 | POST | `/users/:userId/reset-password` | recuperación administrativa auditada |
@@ -95,7 +95,7 @@ por el usuario autenticado.
 
 Todas las rutas requieren sesión. Las lecturas exigen `users.read` o `roles.read`; las mutaciones exigen `users.manage` o `roles.manage`, `Origin` permitido y CSRF. Crear un usuario requiere ambos permisos administrativos porque asigna un rol.
 
-El alta crea un password aleatorio no utilizable y una invitación de recuperación; nunca recibe ni devuelve una contraseña en claro. `PATCH /users/:userId` exige `version` para optimistic locking. Cambiar rol/estado o permisos revoca las sesiones afectadas inmediatamente.
+El alta exige una contraseña inicial de 8 a 200 caracteres definida por el administrador. La API la procesa únicamente para generar su hash Argon2 y nunca la devuelve, registra ni incluye en auditoría u outbox. `PATCH /users/:userId` exige `version` para optimistic locking. Cambiar rol/estado o permisos revoca las sesiones afectadas inmediatamente.
 
 La API rechaza el cambio del propio rol/estado, la edición de permisos del propio rol y cualquier operación que deje cero usuarios activos con `users.manage` + `roles.manage`. La comprobación del último administrador se serializa con un advisory lock transaccional para evitar carreras.
 
@@ -296,8 +296,8 @@ eliminar registros de auditoría.
   "type": "LABOR",
   "status": "ACTIVE",
   "startDate": "2026-05-07",
-  "courtId": "uuid",
-  "managementOfficeId": "uuid",
+  "courtName": "Juzgado Laboral N.º 3",
+  "managementOfficeName": "Oficina 12",
   "participants": [
     { "contactId": "uuid", "role": "CLAIMANT", "side": "OUR_SIDE", "isClient": true },
     { "contactId": "uuid", "role": "DEFENDANT", "side": "COUNTERPART", "isClient": false }

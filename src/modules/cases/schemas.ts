@@ -20,7 +20,7 @@ const participant = participantBase.superRefine((value, context) => { if (value.
 const teamMember = z.object({ userId: uuid, role: z.enum(["PRIMARY", "COLLABORATOR"]) });
 const representation = z.object({ representedContactId: uuid, representativeContactId: uuid, type: z.enum(["ATTORNEY", "LEGAL_REPRESENTATIVE", "POWER_OF_ATTORNEY", "OTHER"]), isPrimary: z.boolean().default(false), notes: z.string().trim().max(10_000).nullable().optional() });
 
-export const createCaseSchema = z.object({ caseNumber: z.string().trim().min(1).max(100), title: z.string().trim().min(2).max(500), type: caseType, status: z.enum(["PENDING", "ACTIVE"]).default("PENDING"), startDate: date, courtId: nullableUuid, managementOfficeId: nullableUuid, participants: z.array(participant).min(1).max(50), representations: z.array(representation).max(50).default([]), team: z.array(teamMember).min(1).max(50) }).superRefine((value, context) => {
+export const createCaseSchema = z.object({ caseNumber: z.string().trim().min(1).max(100), title: z.string().trim().min(2).max(500), type: caseType, status: z.enum(["PENDING", "ACTIVE"]).default("PENDING"), startDate: date, courtId: nullableUuid, managementOfficeId: nullableUuid, courtName: z.string().trim().max(240).nullable().optional(), managementOfficeName: z.string().trim().max(240).nullable().optional(), participants: z.array(participant).min(1).max(50), representations: z.array(representation).max(50).default([]), team: z.array(teamMember).min(1).max(50) }).superRefine((value, context) => {
   if (value.participants.filter((item) => item.isClient).length < 1) context.addIssue({ code: "custom", path: ["participants"], message: "Debe existir al menos una parte cliente." });
   if (value.team.filter((item) => item.role === "PRIMARY").length !== 1) context.addIssue({ code: "custom", path: ["team"], message: "Debe existir exactamente un responsable principal." });
   const participantKeys = value.participants.map((item) => `${item.contactId}:${item.role}`);
@@ -28,7 +28,7 @@ export const createCaseSchema = z.object({ caseNumber: z.string().trim().min(1).
   const teamIds = value.team.map((item) => item.userId);
   if (new Set(teamIds).size !== teamIds.length) context.addIssue({ code: "custom", path: ["team"], message: "No se puede repetir un integrante." });
 });
-export const updateCaseSchema = z.object({ version: z.number().int().positive(), caseNumber: z.string().trim().min(1).max(100).optional(), title: z.string().trim().min(2).max(500).optional(), type: caseType.optional(), startDate: date.optional(), courtId: nullableUuid, managementOfficeId: nullableUuid }).refine((value) => Object.keys(value).length > 1);
+export const updateCaseSchema = z.object({ version: z.number().int().positive(), caseNumber: z.string().trim().min(1).max(100).optional(), title: z.string().trim().min(2).max(500).optional(), type: caseType.optional(), startDate: date.optional(), courtId: nullableUuid, managementOfficeId: nullableUuid, courtName: z.string().trim().max(240).nullable().optional(), managementOfficeName: z.string().trim().max(240).nullable().optional() }).refine((value) => Object.keys(value).length > 1);
 export const transitionCaseSchema = z.object({ version: z.number().int().positive(), toStatus: caseStatus, reason: z.string().trim().min(2).max(2_000).nullable().optional(), openTaskStrategy: z.enum(["KEEP"]).optional() });
 export const createParticipantSchema = participant;
 export const updateParticipantSchema = participantBase.omit({ contactId: true }).partial().refine((value) => Object.keys(value).length > 0);

@@ -401,6 +401,8 @@ model LegalCase {
   archivedOn           DateTime?            @map("archived_on") @db.Date
   courtId              String?              @map("court_id") @db.Uuid
   managementOfficeId   String?              @map("management_office_id") @db.Uuid
+  courtName            String?              @map("court_name") @db.VarChar(240)
+  managementOfficeName String?              @map("management_office_name") @db.VarChar(240)
   createdById          String               @map("created_by_id") @db.Uuid
   version              Int                  @default(1)
   createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)

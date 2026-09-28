@@ -46,7 +46,7 @@ export class UserService {
   }
 
   async create(
-    input: { email: string; name: string; roleId: string },
+    input: { email: string; name: string; roleId: string; password: string },
     actor: AuthenticatedActor,
     context: RequestContext
   ) {
@@ -60,23 +60,16 @@ export class UserService {
       throw new ApiError("VALIDATION_ERROR", "El rol seleccionado no existe.");
     }
 
-    const invitationToken = tokenService.generate();
-    const expiresAt = new Date(Date.now() + config.PASSWORD_RESET_TTL_MINUTES * MINUTE);
-    const unusablePasswordHash = await passwordService.hash(tokenService.generate(48));
+    const passwordHash = await passwordService.hash(input.password);
     const result = await prisma.$transaction(async (transaction) => {
       const user = await userRepository.create(transaction, {
         email: emailNormalized,
         emailNormalized,
         name: input.name,
         roleId: input.roleId,
-        passwordHash: unusablePasswordHash
+        passwordHash,
+        passwordChangedAt: new Date()
       });
-      const reset = await authRepository.createPasswordResetToken(
-        transaction,
-        user.id,
-        tokenService.hash(invitationToken),
-        expiresAt
-      );
       await auditService.record(transaction, {
         actorId: actor.user.id,
         action: "USER_CREATED",
@@ -86,25 +79,14 @@ export class UserService {
         ...auditContext(context)
       });
       await outboxService.publish(transaction, {
-        type: "USER_INVITED",
+        type: "USER_CREATED",
         aggregateType: "User",
         aggregateId: user.id,
-        payload: { userId: user.id, resetTokenId: reset.id, email: user.email }
+        payload: { userId: user.id, email: user.email }
       });
-      return { user, reset };
+      return user;
     });
-
-    try {
-      await this.resetDelivery.deliver({
-        tokenId: result.reset.id,
-        email: result.user.email,
-        token: invitationToken,
-        expiresAt
-      });
-    } catch (error) {
-      logger.error({ err: error, resetTokenId: result.reset.id }, "User invitation delivery failed");
-    }
-    return toUserDto(result.user);
+    return toUserDto(result);
   }
 
   async update(

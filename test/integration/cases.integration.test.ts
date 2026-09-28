@@ -24,8 +24,9 @@ describe("legal cases", () => {
     const logged = await auth(); const person = await contact(logged.user.id, "Cliente");
     const invalid = await request(app).post("/api/v1/cases").set(headers(logged)).send(payload("1b16480d-2608-44af-9e7e-c9b1a868d77b", logged.user.id));
     expect(invalid.status).toBe(400); expect(await testPrisma.legalCase.count()).toBe(0);
-    const created = await request(app).post("/api/v1/cases").set(headers(logged)).send(payload(person.id, logged.user.id));
+    const created = await request(app).post("/api/v1/cases").set(headers(logged)).send(payload(person.id, logged.user.id, { courtName: "Juzgado Laboral 3", managementOfficeName: "Oficina 12" }));
     expect(created.status).toBe(201); expect(created.body.data.participants).toHaveLength(1); expect(created.body.data.team[0].role).toBe("PRIMARY");
+    expect(created.body.data).toMatchObject({ courtName: "Juzgado Laboral 3", managementOfficeName: "Oficina 12" });
     expect((await request(app).delete(`/api/v1/cases/${created.body.data.id}/participants/${created.body.data.participants[0].id}`).set(headers(logged))).status).toBe(409);
     expect(await testPrisma.caseStatusHistory.count()).toBe(1); expect(await testPrisma.auditLog.count({ where: { action: "CASE_CREATED" } })).toBe(1); expect(await testPrisma.outboxEvent.count({ where: { type: "CASE_CREATED" } })).toBe(1);
   });

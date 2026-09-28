@@ -81,7 +81,7 @@ describe("users and RBAC", () => {
     expect(JSON.stringify(allowed.body)).not.toMatch(/passwordHash|tokenHash|csrfSecretHash/);
   });
 
-  it("creates an invited user atomically without exposing credentials", async () => {
+  it("creates a user with an administrator-defined password without exposing credentials", async () => {
     const adminRole = await createRole("ADMIN", [
       "users.read",
       "users.manage",
@@ -97,7 +97,7 @@ describe("users and RBAC", () => {
       .set("Origin", ORIGIN)
       .set("Cookie", auth.cookie)
       .set("x-csrf-token", auth.csrf)
-      .send({ email: "new@example.com", name: "Nueva Persona", roleId: lawyerRole.id });
+      .send({ email: "new@example.com", name: "Nueva Persona", roleId: lawyerRole.id, password: PASSWORD });
 
     expect(response.status).toBe(201);
     expect(response.body.data).toMatchObject({
@@ -106,9 +106,10 @@ describe("users and RBAC", () => {
       role: { code: "LAWYER" }
     });
     expect(JSON.stringify(response.body)).not.toMatch(/passwordHash|tokenHash|csrfSecretHash/);
-    expect(await testPrisma.passwordResetToken.count()).toBe(1);
+    expect((await login("new@example.com")).cookie).toContain("eg_session=");
+    expect(await testPrisma.passwordResetToken.count()).toBe(0);
     expect(await testPrisma.auditLog.count({ where: { action: "USER_CREATED" } })).toBe(1);
-    const event = await testPrisma.outboxEvent.findFirstOrThrow({ where: { type: "USER_INVITED" } });
+    const event = await testPrisma.outboxEvent.findFirstOrThrow({ where: { type: "USER_CREATED" } });
     expect(JSON.stringify(event.payload)).not.toContain("ClaveSegura");
   });
 
@@ -122,7 +123,7 @@ describe("users and RBAC", () => {
       .set("Origin", ORIGIN)
       .set("Cookie", auth.cookie)
       .set("x-csrf-token", auth.csrf)
-      .send({ email: "new@example.com", name: "Nueva Persona", roleId: targetRole.id });
+      .send({ email: "new@example.com", name: "Nueva Persona", roleId: targetRole.id, password: PASSWORD });
     expect(response.status).toBe(403);
     expect(await testPrisma.user.count()).toBe(1);
   });

@@ -13,7 +13,7 @@ import { caseRepository } from "./repo.js";
 type ParticipantInput = { contactId: string; role: ParticipantRole; side: PartySide; isClient: boolean; label?: string | null | undefined; notes?: string | null | undefined; sortOrder: number };
 type TeamInput = { userId: string; role: "PRIMARY" | "COLLABORATOR" };
 type RepresentationInput = { representedContactId: string; representativeContactId: string; type: RepresentationType; isPrimary: boolean; notes?: string | null | undefined };
-type CreateInput = { caseNumber: string; title: string; type: CaseType; status: "PENDING" | "ACTIVE"; startDate: Date; courtId?: string | null | undefined; managementOfficeId?: string | null | undefined; participants: ParticipantInput[]; representations: RepresentationInput[]; team: TeamInput[] };
+type CreateInput = { caseNumber: string; title: string; type: CaseType; status: "PENDING" | "ACTIVE"; startDate: Date; courtId?: string | null | undefined; managementOfficeId?: string | null | undefined; courtName?: string | null | undefined; managementOfficeName?: string | null | undefined; participants: ParticipantInput[]; representations: RepresentationInput[]; team: TeamInput[] };
 
 const metadata = (context: RequestContext) => ({ ...(context.requestId ? { requestId: context.requestId } : {}), ...(context.ipAddress ? { ipAddress: context.ipAddress } : {}), ...(context.userAgent ? { userAgent: context.userAgent } : {}) });
 const today = () => { const now = new Date(); return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())); };
@@ -37,7 +37,7 @@ export class CaseService {
     if (!actor.user.permissions.includes("cases.archive") && primary?.userId !== actor.user.id) throw new ApiError("FORBIDDEN", "Sólo puede asignarse a sí mismo como responsable inicial.");
     return prisma.$transaction(async (transaction) => {
       await this.validateReferences(transaction, input);
-      const legalCase = await caseRepository.create(transaction, { caseNumber: input.caseNumber, caseNumberNormalized: normalizeIdentifier(input.caseNumber), title: input.title, type: input.type, status: input.status, startDate: input.startDate, courtId: input.courtId ?? null, managementOfficeId: input.managementOfficeId ?? null, createdById: actor.user.id });
+      const legalCase = await caseRepository.create(transaction, { caseNumber: input.caseNumber, caseNumberNormalized: normalizeIdentifier(input.caseNumber), title: input.title, type: input.type, status: input.status, startDate: input.startDate, courtId: input.courtId ?? null, managementOfficeId: input.managementOfficeId ?? null, courtName: input.courtName ?? null, managementOfficeName: input.managementOfficeName ?? null, createdById: actor.user.id });
       const participants = [];
       for (const item of input.participants) participants.push(await caseRepository.createParticipant(transaction, { caseId: legalCase.id, contactId: item.contactId, role: item.role, side: item.side, isClient: item.isClient, sortOrder: item.sortOrder, ...(item.label !== undefined ? { label: item.label } : {}), ...(item.notes !== undefined ? { notes: item.notes } : {}) }));
       for (const item of input.representations) {
@@ -54,12 +54,12 @@ export class CaseService {
     });
   }
 
-  async update(id: string, input: { version: number; caseNumber?: string | undefined; title?: string | undefined; type?: CaseType | undefined; startDate?: Date | undefined; courtId?: string | null | undefined; managementOfficeId?: string | null | undefined }, actor: AuthenticatedActor, context: RequestContext) {
+  async update(id: string, input: { version: number; caseNumber?: string | undefined; title?: string | undefined; type?: CaseType | undefined; startDate?: Date | undefined; courtId?: string | null | undefined; managementOfficeId?: string | null | undefined; courtName?: string | null | undefined; managementOfficeName?: string | null | undefined }, actor: AuthenticatedActor, context: RequestContext) {
     const prisma = getPrisma(); const current = await caseRepository.findById(prisma, id); if (!current) throw new ApiError("NOT_FOUND", "Expediente no encontrado."); if (current.status === "ARCHIVED") throw new ApiError("CONFLICT", "Un expediente archivado es de sólo lectura.");
     const courtId = input.courtId !== undefined ? input.courtId : current.courtId; const officeId = input.managementOfficeId !== undefined ? input.managementOfficeId : current.managementOfficeId;
     return prisma.$transaction(async (transaction) => {
       await this.validateLocation(transaction, courtId, officeId);
-      const updated = await caseRepository.update(transaction, id, input.version, { ...(input.caseNumber !== undefined ? { caseNumber: input.caseNumber, caseNumberNormalized: normalizeIdentifier(input.caseNumber) } : {}), ...(input.title !== undefined ? { title: input.title } : {}), ...(input.type !== undefined ? { type: input.type } : {}), ...(input.startDate !== undefined ? { startDate: input.startDate } : {}), ...(input.courtId !== undefined ? { courtId: input.courtId } : {}), ...(input.managementOfficeId !== undefined ? { managementOfficeId: input.managementOfficeId } : {}) });
+      const updated = await caseRepository.update(transaction, id, input.version, { ...(input.caseNumber !== undefined ? { caseNumber: input.caseNumber, caseNumberNormalized: normalizeIdentifier(input.caseNumber) } : {}), ...(input.title !== undefined ? { title: input.title } : {}), ...(input.type !== undefined ? { type: input.type } : {}), ...(input.startDate !== undefined ? { startDate: input.startDate } : {}), ...(input.courtId !== undefined ? { courtId: input.courtId } : {}), ...(input.managementOfficeId !== undefined ? { managementOfficeId: input.managementOfficeId } : {}), ...(input.courtName !== undefined ? { courtName: input.courtName } : {}), ...(input.managementOfficeName !== undefined ? { managementOfficeName: input.managementOfficeName } : {}) });
       if (!updated) throw new ApiError("CONFLICT", "El expediente fue modificado por otra operación.");
       await auditService.record(transaction, { actorId: actor.user.id, action: "CASE_UPDATED", entityType: "LegalCase", entityId: id, before: { version: current.version }, after: { version: updated.version }, ...metadata(context) });
       await outboxService.publish(transaction, { type: "CASE_UPDATED", aggregateType: "LegalCase", aggregateId: id, payload: { caseId: id, version: updated.version } }); return toCaseDto(updated);

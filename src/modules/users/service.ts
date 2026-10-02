@@ -9,6 +9,7 @@ import {
 import { auditService } from "../audit/service.js";
 import { passwordService } from "../auth/password.service.js";
 import { authRepository } from "../auth/repo.js";
+import { toAuthenticatedUser } from "../auth/session.service.js";
 import { tokenService } from "../auth/token.service.js";
 import type { AuthenticatedActor, RequestContext } from "../auth/types.js";
 import { authorizationService } from "../authorization/service.js";
@@ -98,15 +99,20 @@ export class UserService {
       avatarUrl?: string | null | undefined;
       roleId?: string | undefined;
       status?: "ACTIVE" | "SUSPENDED" | "DISABLED" | undefined;
+      password?: string | undefined;
     },
     actor: AuthenticatedActor,
     context: RequestContext
   ) {
+    authorizationService.requirePermission(actor, "users.manage");
     const prisma = getPrisma();
     const current = await userRepository.findById(prisma, userId);
     if (!current) throw new ApiError("NOT_FOUND", "Usuario no encontrado.");
     if (userId === actor.user.id && (input.roleId !== undefined || input.status !== undefined)) {
       throw new ApiError("FORBIDDEN", "No podés cambiar tu propio rol o estado.");
+    }
+    if (userId === actor.user.id && input.password !== undefined) {
+      throw new ApiError("FORBIDDEN", "Usá el cambio de contraseña de tu perfil.");
     }
     if (input.roleId !== undefined) {
       authorizationService.requirePermission(actor, "roles.manage");
@@ -121,11 +127,13 @@ export class UserService {
       }
     }
 
-    const { version, ...changes } = input;
+    const { version, password, ...changes } = input;
+    const passwordHash = password ? await passwordService.hash(password) : undefined;
     const email = changes.email?.trim().toLowerCase();
     const shouldRevoke =
       (changes.roleId !== undefined && changes.roleId !== current.roleId) ||
-      (changes.status !== undefined && changes.status !== current.status);
+      (changes.status !== undefined && changes.status !== current.status) ||
+      passwordHash !== undefined;
     const updated = await prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(2026091801)`;
       const lockedCurrent = await userRepository.findById(transaction, userId);
@@ -152,10 +160,20 @@ export class UserService {
         ...(changes.name !== undefined ? { name: changes.name } : {}),
         ...(changes.avatarUrl !== undefined ? { avatarUrl: changes.avatarUrl } : {}),
         ...(changes.roleId !== undefined ? { roleId: changes.roleId } : {}),
-        ...(changes.status !== undefined ? { status: changes.status } : {})
+        ...(changes.status !== undefined ? { status: changes.status } : {}),
+        ...(passwordHash
+          ? {
+              passwordHash,
+              passwordChangedAt: new Date(),
+              failedLoginCount: 0,
+              lockedUntil: null
+            }
+          : {})
       });
       if (!user) throw new ApiError("CONFLICT", "El usuario fue modificado por otra operación.");
-      if (shouldRevoke) await authRepository.revokeUserSessions(transaction, userId, new Date());
+      const now = new Date();
+      if (passwordHash) await authRepository.invalidatePasswordResetTokens(transaction, userId, now);
+      if (shouldRevoke) await authRepository.revokeUserSessions(transaction, userId, now);
       await auditService.record(transaction, {
         actorId: actor.user.id,
         action: "USER_UPDATED",
@@ -163,7 +181,7 @@ export class UserService {
         entityId: userId,
         before: { email: current.email, name: current.name, roleId: current.roleId, status: current.status },
         after: { email: user.email, name: user.name, roleId: user.roleId, status: user.status },
-        metadata: { sessionsRevoked: shouldRevoke },
+        metadata: { sessionsRevoked: shouldRevoke, passwordChanged: Boolean(passwordHash) },
         ...auditContext(context)
       });
       await outboxService.publish(transaction, {
@@ -172,9 +190,59 @@ export class UserService {
         aggregateId: userId,
         payload: { userId, sessionsRevoked: shouldRevoke }
       });
+      if (passwordHash) {
+        await outboxService.publish(transaction, {
+          type: "AUTH_PASSWORD_CHANGED",
+          aggregateType: "User",
+          aggregateId: userId,
+          payload: { userId }
+        });
+      }
       return user;
     });
     return toUserDto(updated);
+  }
+
+  async updateOwnProfile(
+    input: {
+      version: number;
+      email?: string | undefined;
+      name?: string | undefined;
+      avatarUrl?: string | null | undefined;
+    },
+    actor: AuthenticatedActor,
+    context: RequestContext
+  ) {
+    const prisma = getPrisma();
+    const current = await userRepository.findById(prisma, actor.user.id);
+    if (!current) throw new ApiError("NOT_FOUND", "Usuario no encontrado.");
+    const email = input.email?.trim().toLowerCase();
+    if (email) {
+      const duplicate = await userRepository.findByEmail(prisma, email);
+      if (duplicate && duplicate.id !== actor.user.id) {
+        throw new ApiError("CONFLICT", "Ya existe un usuario con ese email.");
+      }
+    }
+
+    const updated = await prisma.$transaction(async (transaction) => {
+      const user = await userRepository.update(transaction, actor.user.id, input.version, {
+        ...(email ? { email, emailNormalized: email } : {}),
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl } : {})
+      });
+      if (!user) throw new ApiError("CONFLICT", "Tu perfil fue modificado por otra operación.");
+      await auditService.record(transaction, {
+        actorId: actor.user.id,
+        action: "USER_PROFILE_UPDATED",
+        entityType: "User",
+        entityId: actor.user.id,
+        before: { email: current.email, name: current.name, avatarUrl: current.avatarUrl },
+        after: { email: user.email, name: user.name, avatarUrl: user.avatarUrl },
+        ...auditContext(context)
+      });
+      return user;
+    });
+    return toAuthenticatedUser(updated);
   }
 
   async revokeSessions(userId: string, actor: AuthenticatedActor, context: RequestContext) {

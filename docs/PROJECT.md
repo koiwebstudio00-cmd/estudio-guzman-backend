@@ -32,7 +32,7 @@ Los servicios no autorizan por el nombre del rol. Evalúan permisos atómicos co
 |---|---|---|
 | Health | liveness de proceso y readiness de DB/storage | implementado |
 | Auth | login, logout, recuperación, CSRF y sesiones | implementado e integrado con la SPA |
-| Users/RBAC | equipo, roles, permisos y estado de usuario | implementado e integrado con la SPA |
+| Users/RBAC | equipo, roles, permisos, edición de perfiles y cambio de contraseñas | implementado e integrado con la SPA |
 | Contacts | personas/organizaciones, categorías, canales y domicilios | implementado e integrado con la SPA |
 | Cases | expedientes, radicación, estado, partes y equipo interno | implementado e integrado con la SPA |
 | Subcases | cuadernos de prueba e incidentes | implementado e integrado con la SPA |

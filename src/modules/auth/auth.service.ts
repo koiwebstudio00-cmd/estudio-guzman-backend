@@ -219,6 +219,41 @@ export class AuthService {
       logger.warn({ err: error, resetTokenId: reset.id }, "Password reset artifact cleanup failed");
     });
   }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+    actor: AuthenticatedActor,
+    context: RequestContext
+  ): Promise<void> {
+    const prisma = getPrisma();
+    const user = await this.repository.findUserById(prisma, actor.user.id);
+    if (!user || !(await this.passwords.verify(user.passwordHash, currentPassword).catch(() => false))) {
+      throw new ApiError("VALIDATION_ERROR", "La contraseña actual es incorrecta.");
+    }
+
+    const passwordHash = await this.passwords.hash(newPassword);
+    const now = new Date();
+    await prisma.$transaction(async (transaction) => {
+      await this.repository.updatePassword(transaction, actor.user.id, passwordHash, now);
+      await this.repository.invalidatePasswordResetTokens(transaction, actor.user.id, now);
+      const revoked = await this.repository.revokeUserSessions(transaction, actor.user.id, now);
+      await this.audit.record(transaction, {
+        actorId: actor.user.id,
+        action: "AUTH_PASSWORD_CHANGED",
+        entityType: "User",
+        entityId: actor.user.id,
+        metadata: { revokedSessions: revoked.count },
+        ...auditContext(context)
+      });
+      await this.outbox.publish(transaction, {
+        type: "AUTH_PASSWORD_CHANGED",
+        aggregateType: "User",
+        aggregateId: actor.user.id,
+        payload: { userId: actor.user.id }
+      });
+    });
+  }
 }
 
 export const authService = new AuthService();

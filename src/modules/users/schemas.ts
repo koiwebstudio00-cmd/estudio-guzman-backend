@@ -1,9 +1,9 @@
 import { z } from "zod";
+import { strongPasswordSchema } from "../auth/schemas.js";
 
 const uuid = z.string().uuid("El identificador es inválido.");
 const email = z.string().trim().email("Ingresá un email válido.").max(320);
 const name = z.string().trim().min(2).max(160);
-const password = z.string().min(8, "La contraseña debe tener al menos 8 caracteres.").max(200);
 
 export const userIdParamsSchema = z.object({ userId: uuid });
 
@@ -13,7 +13,7 @@ export const listUsersQuerySchema = z.object({
   roleId: uuid.optional()
 });
 
-export const createUserSchema = z.object({ email, name, roleId: uuid, password });
+export const createUserSchema = z.object({ email, name, roleId: uuid, password: strongPasswordSchema });
 
 export const updateUserSchema = z
   .object({
@@ -22,14 +22,16 @@ export const updateUserSchema = z
     name: name.optional(),
     avatarUrl: z.string().trim().url().max(2_000).nullable().optional(),
     roleId: uuid.optional(),
-    status: z.enum(["ACTIVE", "SUSPENDED", "DISABLED"]).optional()
+    status: z.enum(["ACTIVE", "SUSPENDED", "DISABLED"]).optional(),
+    password: strongPasswordSchema.optional()
   })
   .refine(
-    ({ email, name: userName, avatarUrl, roleId, status }) =>
+    ({ email, name: userName, avatarUrl, roleId, status, password }) =>
       email !== undefined ||
       userName !== undefined ||
       avatarUrl !== undefined ||
       roleId !== undefined ||
-      status !== undefined,
+      status !== undefined ||
+      password !== undefined,
     { message: "Debés enviar al menos un cambio." }
   );

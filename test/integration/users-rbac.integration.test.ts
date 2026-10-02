@@ -177,6 +177,58 @@ describe("users and RBAC", () => {
     expect((await request(buildApp()).get("/api/v1/auth/me").set("Cookie", targetAuth.cookie)).status).toBe(401);
   });
 
+  it("lets an administrator update another user's profile and password without exposing it", async () => {
+    const adminRole = await createRole("ADMIN", [
+      "users.manage",
+      "roles.manage",
+      "users.read"
+    ]);
+    const staffRole = await createRole("STAFF", ["users.read"]);
+    const admin = await createUser("admin@example.com", adminRole.id);
+    const target = await createUser("target@example.com", staffRole.id);
+    const adminAuth = await login(admin.email);
+    const targetAuth = await login(target.email);
+    const newPassword = "NuevaClaveSegura456";
+
+    const response = await request(buildApp())
+      .patch(`/api/v1/users/${target.id}`)
+      .set("Origin", ORIGIN)
+      .set("Cookie", adminAuth.cookie)
+      .set("x-csrf-token", adminAuth.csrf)
+      .send({
+        version: target.version,
+        name: "Usuario Actualizado",
+        email: "actualizado@example.com",
+        password: newPassword
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      name: "Usuario Actualizado",
+      email: "actualizado@example.com",
+      version: target.version + 1
+    });
+    expect(JSON.stringify(response.body)).not.toContain(newPassword);
+    expect((await request(buildApp()).get("/api/v1/auth/me").set("Cookie", targetAuth.cookie)).status).toBe(401);
+    expect((await request(buildApp()).post("/api/v1/auth/login").set("Origin", ORIGIN).send({ email: "actualizado@example.com", password: newPassword })).status).toBe(200);
+    const audit = await testPrisma.auditLog.findFirstOrThrow({ where: { action: "USER_UPDATED" } });
+    expect(JSON.stringify({ before: audit.before, after: audit.after, metadata: audit.metadata })).not.toContain(newPassword);
+    expect(audit.metadata).toMatchObject({ passwordChanged: true, sessionsRevoked: true });
+  });
+
+  it("does not let an administrator bypass the current password for their own account", async () => {
+    const adminRole = await createRole("ADMIN", ["users.manage", "roles.manage"]);
+    const admin = await createUser("admin@example.com", adminRole.id);
+    const auth = await login(admin.email);
+    const response = await request(buildApp())
+      .patch(`/api/v1/users/${admin.id}`)
+      .set("Origin", ORIGIN)
+      .set("Cookie", auth.cookie)
+      .set("x-csrf-token", auth.csrf)
+      .send({ version: admin.version, password: "NuevaClaveSegura456" });
+    expect(response.status).toBe(403);
+  });
+
   it("rejects changing the actor's own role permissions", async () => {
     const adminRole = await createRole("ADMIN", [
       "users.manage",

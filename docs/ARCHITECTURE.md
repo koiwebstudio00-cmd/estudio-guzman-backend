@@ -166,10 +166,10 @@ Los middlewares autentican y validan requisitos generales; la autorización sobr
 
 | Servicio | Responsabilidad |
 |---|---|
-| `AuthService` | login, recuperación y cambio de contraseña |
+| `AuthService` | login, recuperación y cambio de contraseña propia con verificación de la vigente |
 | `SessionService` | emitir, hashear, renovar, revocar y limpiar sesiones opacas |
 | `AuthorizationService` | resolver permisos y políticas sobre recursos |
-| `UserService` | altas, estado, perfil, rol y protección del último administrador |
+| `UserService` | altas, perfil propio, administración de terceros, contraseña administrativa, estado, rol y protección del último administrador |
 | `ContactService` | normalización, duplicados, categorías, canales y domicilios |
 | `CaseService` | expediente, radicación, estado y transacciones principales |
 | `ParticipantService` | partes procesales y representaciones |

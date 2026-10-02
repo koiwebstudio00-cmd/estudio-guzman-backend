@@ -6,9 +6,16 @@ import { createLoginRateLimit } from "../../middleware/rate-limit.js";
 import { validateRequest } from "../../middleware/validate.js";
 import { ApiError } from "../../shared/http/errors.js";
 import { requireAllowedOrigin } from "../../shared/http/origin.js";
+import { userService } from "../users/service.js";
 import { authService } from "./auth.service.js";
 import { clearSessionCookie, setSessionCookie } from "./cookies.js";
-import { forgotPasswordSchema, loginSchema, resetPasswordSchema } from "./schemas.js";
+import {
+  changePasswordSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+  updateOwnProfileSchema
+} from "./schemas.js";
 import { sessionService } from "./session.service.js";
 import type { RequestContext } from "./types.js";
 
@@ -44,6 +51,16 @@ export function createAuthRoutes(): Router {
   router.get("/auth/me", authenticate, (req, res) => {
     res.json({ data: { user: actor(req).user } });
   });
+
+  router.patch(
+    "/auth/me",
+    authenticate,
+    csrfProtection,
+    validateRequest({ body: updateOwnProfileSchema }, async (req, res, { body }) => {
+      const user = await userService.updateOwnProfile(body, actor(req), requestContext(req));
+      res.json({ data: { user } });
+    })
+  );
 
   router.get("/auth/csrf", authenticate, (req, res) => {
     const sessionToken = req.cookies?.[config.SESSION_COOKIE_NAME];
@@ -91,6 +108,23 @@ export function createAuthRoutes(): Router {
     requireAllowedOrigin,
     validateRequest({ body: resetPasswordSchema }, async (req, res, { body }) => {
       await authService.resetPassword(body.token, body.password, requestContext(req));
+      res.status(204).end();
+    })
+  );
+
+  router.post(
+    "/auth/change-password",
+    authenticate,
+    csrfProtection,
+    loginRateLimit,
+    validateRequest({ body: changePasswordSchema }, async (req, res, { body }) => {
+      await authService.changePassword(
+        body.currentPassword,
+        body.newPassword,
+        actor(req),
+        requestContext(req)
+      );
+      clearSessionCookie(res);
       res.status(204).end();
     })
   );

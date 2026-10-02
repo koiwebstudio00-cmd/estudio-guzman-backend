@@ -13,6 +13,7 @@ function toAuthenticatedUser(user: Awaited<ReturnType<AuthRepositoryShape["findU
 
   return {
     id: user.id,
+    version: user.version,
     email: user.email,
     name: user.name,
     avatarUrl: user.avatarUrl,

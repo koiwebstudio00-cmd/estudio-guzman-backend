@@ -22,7 +22,36 @@ paths:
   /auth/logout:
     post: { parameters: [ { $ref: '#/components/parameters/Csrf' } ], responses: { '204': { description: Sesión revocada }, '403': { $ref: '#/components/responses/Problem' } } }
   /auth/me:
-    get: { responses: { '200': { description: Usuario y permisos efectivos }, '401': { $ref: '#/components/responses/Problem' } } }
+    get: { responses: { '200': { description: Usuario, versión y permisos efectivos }, '401': { $ref: '#/components/responses/Problem' } } }
+    patch:
+      parameters: [ { $ref: '#/components/parameters/Csrf' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: integer, minimum: 1 }
+                email: { type: string, format: email, maxLength: 320 }
+                name: { type: string, minLength: 2, maxLength: 160 }
+                avatarUrl: { type: [string, 'null'], format: uri, maxLength: 2000 }
+      responses: { '200': { description: Perfil propio actualizado }, '409': { $ref: '#/components/responses/Problem' } }
+  /auth/change-password:
+    post:
+      parameters: [ { $ref: '#/components/parameters/Csrf' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, writeOnly: true, maxLength: 200 }
+                newPassword: { type: string, writeOnly: true, minLength: 8, maxLength: 200 }
+      responses: { '204': { description: Contraseña actualizada y sesiones revocadas }, '400': { $ref: '#/components/responses/Problem' }, '429': { $ref: '#/components/responses/Problem' } }
   /dashboard:
     get:
       summary: Dashboard operativo
@@ -66,6 +95,27 @@ paths:
                 roleId: { type: string, format: uuid }
                 password: { type: string, minLength: 8, maxLength: 200, writeOnly: true }
       responses: { '201': { description: Usuario creado con contraseña inicial hasheada }, '400': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } }
+  /users/{userId}:
+    parameters: [ { name: userId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get: { responses: { '200': { description: Usuario autorizado }, '404': { $ref: '#/components/responses/Problem' } } }
+    patch:
+      parameters: [ { $ref: '#/components/parameters/Csrf' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: integer, minimum: 1 }
+                email: { type: string, format: email, maxLength: 320 }
+                name: { type: string, minLength: 2, maxLength: 160 }
+                avatarUrl: { type: [string, 'null'], format: uri, maxLength: 2000 }
+                roleId: { type: string, format: uuid }
+                status: { type: string, enum: [ACTIVE, SUSPENDED, DISABLED] }
+                password: { type: string, writeOnly: true, minLength: 8, maxLength: 200 }
+      responses: { '200': { description: Usuario actualizado; los cambios sensibles revocan sus sesiones }, '403': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } }
   /cases:
     get: { responses: { '200': { description: Expedientes paginados } } }
     post:

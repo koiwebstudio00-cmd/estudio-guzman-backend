@@ -178,6 +178,73 @@ describe("authentication HTTP flow", () => {
     }
     expect(lastStatus).toBe(429);
   });
+
+  it("updates the own profile with optimistic locking", async () => {
+    const user = await createAuthUser();
+    const app = buildApp();
+    const login = await request(app)
+      .post("/api/v1/auth/login")
+      .set("Origin", ORIGIN)
+      .send({ email: user.email, password: PASSWORD });
+    const cookie = cookieValue(login.headers["set-cookie"] as unknown as string[]);
+
+    const updated = await request(app)
+      .patch("/api/v1/auth/me")
+      .set("Origin", ORIGIN)
+      .set("Cookie", cookie)
+      .set("x-csrf-token", login.body.data.csrfToken)
+      .send({ version: login.body.data.user.version, name: "Perfil Actualizado", email: "perfil@example.com" });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.user).toMatchObject({
+      id: user.id,
+      version: user.version + 1,
+      name: "Perfil Actualizado",
+      email: "perfil@example.com"
+    });
+    expect(await testPrisma.auditLog.count({ where: { action: "USER_PROFILE_UPDATED" } })).toBe(1);
+
+    const stale = await request(app)
+      .patch("/api/v1/auth/me")
+      .set("Origin", ORIGIN)
+      .set("Cookie", cookie)
+      .set("x-csrf-token", login.body.data.csrfToken)
+      .send({ version: user.version, name: "Cambio obsoleto" });
+    expect(stale.status).toBe(409);
+  });
+
+  it("changes the own password, requires the current one and revokes every session", async () => {
+    const user = await createAuthUser();
+    const app = buildApp();
+    const login = await request(app)
+      .post("/api/v1/auth/login")
+      .set("Origin", ORIGIN)
+      .send({ email: user.email, password: PASSWORD });
+    const cookie = cookieValue(login.headers["set-cookie"] as unknown as string[]);
+    const headers = {
+      Origin: ORIGIN,
+      Cookie: cookie,
+      "x-csrf-token": login.body.data.csrfToken as string
+    };
+
+    const incorrect = await request(app)
+      .post("/api/v1/auth/change-password")
+      .set(headers)
+      .send({ currentPassword: "Incorrecta123", newPassword: "NuevaClaveSegura456" });
+    expect(incorrect.status).toBe(400);
+    expect((await request(app).get("/api/v1/auth/me").set("Cookie", cookie)).status).toBe(200);
+
+    const changed = await request(app)
+      .post("/api/v1/auth/change-password")
+      .set(headers)
+      .send({ currentPassword: PASSWORD, newPassword: "NuevaClaveSegura456" });
+    expect(changed.status).toBe(204);
+    expect((await request(app).get("/api/v1/auth/me").set("Cookie", cookie)).status).toBe(401);
+    expect(
+      (await request(buildApp()).post("/api/v1/auth/login").set("Origin", ORIGIN).send({ email: user.email, password: "NuevaClaveSegura456" })).status
+    ).toBe(200);
+    expect(await testPrisma.auditLog.count({ where: { action: "AUTH_PASSWORD_CHANGED" } })).toBe(1);
+  });
 });
 
 describe("sessions and password recovery", () => {

@@ -32,7 +32,9 @@
 | POST | `/auth/logout` | revocar sesión actual y borrar cookie |
 | POST | `/auth/logout-all` | revocar todas las sesiones propias |
 | GET | `/auth/me` | usuario, rol y permisos efectivos |
+| PATCH | `/auth/me` | editar nombre, email o avatar propios con `version` |
 | GET | `/auth/csrf` | recuperar el token CSRF derivado de la sesión vigente |
+| POST | `/auth/change-password` | cambiar la contraseña propia verificando la actual y revocar sesiones |
 | POST | `/auth/forgot-password` | iniciar recuperación sin revelar existencia |
 | POST | `/auth/reset-password` | consumir token, cambiar password y revocar sesiones |
 
@@ -56,7 +58,7 @@ Login y recuperación tienen rate limit. Las mutaciones autenticadas validan CSR
 }
 ```
 
-La sesión se entrega además en una cookie `HttpOnly` con path `/api/v1`; el cuerpo nunca contiene el token de sesión. `GET /auth/me` devuelve sólo `user` y `GET /auth/csrf` permite reconstruir el estado CSRF de la SPA después de un refresh. `POST /auth/logout`, `POST /auth/logout-all` y `POST /auth/reset-password` responden `204`.
+La sesión se entrega además en una cookie `HttpOnly` con path `/api/v1`; el cuerpo nunca contiene el token de sesión. `GET /auth/me` devuelve `user`, incluida su `version`, y `GET /auth/csrf` permite reconstruir el estado CSRF de la SPA después de un refresh. `PATCH /auth/me` acepta `{ "version", "name"?, "email"?, "avatarUrl"? }`, no permite modificar rol ni estado y registra `USER_PROFILE_UPDATED`. `POST /auth/change-password` acepta `{ "currentPassword", "newPassword" }`, exige la contraseña vigente, revoca todas las sesiones y responde `204`; la SPA debe solicitar un nuevo login. `POST /auth/logout`, `POST /auth/logout-all` y `POST /auth/reset-password` también responden `204`.
 
 Las mutaciones autenticadas envían `x-csrf-token` y un `Origin` incluido en `CORS_ORIGIN`. Login, forgot y reset también exigen un origen permitido. Credenciales incorrectas, cuentas inexistentes, suspendidas o bloqueadas comparten la misma respuesta `401`.
 
@@ -85,7 +87,7 @@ por el usuario autenticado.
 | GET | `/users?status=&roleId=&cursor=` | `users.read` |
 | POST | `/users` | `users.manage`; crear con contraseña inicial |
 | GET | `/users/:userId` | `users.read` |
-| PATCH | `/users/:userId` | `users.manage`; perfil, rol o estado |
+| PATCH | `/users/:userId` | `users.manage`; perfil, rol, estado o contraseña de otro usuario |
 | POST | `/users/:userId/reset-password` | recuperación administrativa auditada |
 | POST | `/users/:userId/revoke-sessions` | revocar sesiones del usuario |
 | GET | `/roles` | listar roles y permisos |
@@ -95,7 +97,7 @@ por el usuario autenticado.
 
 Todas las rutas requieren sesión. Las lecturas exigen `users.read` o `roles.read`; las mutaciones exigen `users.manage` o `roles.manage`, `Origin` permitido y CSRF. Crear un usuario requiere ambos permisos administrativos porque asigna un rol.
 
-El alta exige una contraseña inicial de 8 a 200 caracteres definida por el administrador. La API la procesa únicamente para generar su hash Argon2 y nunca la devuelve, registra ni incluye en auditoría u outbox. `PATCH /users/:userId` exige `version` para optimistic locking. Cambiar rol/estado o permisos revoca las sesiones afectadas inmediatamente.
+El alta exige una contraseña inicial de 8 a 200 caracteres definida por el administrador. Las contraseñas nuevas deben incluir mayúscula, minúscula y número. La API las procesa únicamente para generar su hash Argon2 y nunca las devuelve, registra ni incluye en auditoría u outbox. `PATCH /users/:userId` exige `version` para optimistic locking y permite el campo opcional `password` sólo para administrar a otro usuario. Cambiar contraseña, rol/estado o permisos revoca las sesiones afectadas inmediatamente. Un administrador cambia su propia contraseña únicamente mediante `/auth/change-password`, verificando la contraseña actual.
 
 La API rechaza el cambio del propio rol/estado, la edición de permisos del propio rol y cualquier operación que deje cero usuarios activos con `users.manage` + `roles.manage`. La comprobación del último administrador se serializa con un advisory lock transaccional para evitar carreras.
 

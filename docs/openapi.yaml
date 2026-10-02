@@ -194,10 +194,11 @@ components:
       properties: { type: { type: string, format: uri }, title: { type: string }, status: { type: integer }, detail: { type: string }, instance: { type: string }, requestId: { type: string, format: uuid } }
     ActivityActor:
       type: object
-      required: [id, name]
+      required: [id, name, avatarUrl]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
+        avatarUrl: { type: [string, 'null'], format: uri }
     DashboardActivityEntry:
       type: object
       required: [id, action, entityType, entityId, actor, createdAt]
@@ -228,11 +229,12 @@ components:
               items: { $ref: '#/components/schemas/DashboardActivityEntry' }
     AuditActor:
       type: object
-      required: [id, name, email]
+      required: [id, name, email, avatarUrl]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
         email: { type: string, format: email }
+        avatarUrl: { type: [string, 'null'], format: uri }
     AuditLogEntry:
       type: object
       required: [id, action, entityType, entityId, actor, createdAt, before, after, metadata, requestId, ipAddress, userAgent]

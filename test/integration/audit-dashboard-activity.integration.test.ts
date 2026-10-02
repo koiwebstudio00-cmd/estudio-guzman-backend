@@ -8,6 +8,7 @@ import { resetTestDatabase, testPrisma } from "../helpers/database.js";
 
 const ORIGIN = "http://localhost:3000";
 const PASSWORD = "ClaveSegura123";
+const avatarUrl = (suffix: string) => `https://images.example.com/${suffix}.webp`;
 
 async function auth(codes: string[], suffix: string) {
   const permissions = await Promise.all(
@@ -33,6 +34,7 @@ async function auth(codes: string[], suffix: string) {
       email: `${suffix}@example.com`,
       emailNormalized: `${suffix}@example.com`,
       name: suffix,
+      avatarUrl: avatarUrl(suffix),
       passwordHash: await passwordService.hash(PASSWORD),
       roleId: role.id
     }
@@ -115,7 +117,8 @@ describe("audit log and dashboard activity separation", () => {
       actor: {
         id: admin.user.id,
         name: admin.user.name,
-        email: admin.user.email
+        email: admin.user.email,
+        avatarUrl: admin.user.avatarUrl
       },
       createdAt: "2026-05-10T00:00:00.000Z",
       before: { status: "PENDING" },
@@ -223,6 +226,16 @@ describe("audit log and dashboard activity separation", () => {
       expect.arrayContaining(["CASE_CREATED", "TASK_UPDATED", "CONTACT_CREATED"])
     );
     expect(actions.every((action: string) => !/^(AUTH_|USER_)/.test(action))).toBe(true);
+    expect(response.body.data.activity).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actor: expect.objectContaining({ avatarUrl: admin.user.avatarUrl })
+        }),
+        expect.objectContaining({
+          actor: expect.objectContaining({ avatarUrl: other.user.avatarUrl })
+        })
+      ])
+    );
   });
 
   it("keeps dashboard activity scoped to the authenticated actor without audit.read", async () => {
@@ -256,5 +269,6 @@ describe("audit log and dashboard activity separation", () => {
     expect(response.body.data.activity.map((entry: { action: string }) => entry.action)).toEqual([
       "CASE_CREATED"
     ]);
+    expect(response.body.data.activity[0].actor.avatarUrl).toBe(mine.user.avatarUrl);
   });
 });

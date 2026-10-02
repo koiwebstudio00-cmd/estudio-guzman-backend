@@ -35,7 +35,7 @@ export class DashboardRepository {
         entityType: true,
         entityId: true,
         createdAt: true,
-        actor: { select: { id: true, name: true } }
+        actor: { select: { id: true, name: true, avatarUrl: true } }
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 10

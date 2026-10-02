@@ -262,7 +262,7 @@ dashboard. Usa cursor descendente, devuelve como máximo 100 registros por pági
       "action": "CASE_CREATED",
       "entityType": "LegalCase",
       "entityId": "uuid",
-      "actor": { "id": "uuid", "name": "Usuario", "email": "usuario@example.com" },
+      "actor": { "id": "uuid", "name": "Usuario", "email": "usuario@example.com", "avatarUrl": "https://example.com/avatar.webp" },
       "createdAt": "2026-09-20T15:30:00.000Z",
       "before": null,
       "after": { "status": "ACTIVE" },
@@ -288,6 +288,9 @@ Filtros disponibles:
 
 La colección siempre conserva `data` y `meta.nextCursor`. No existe endpoint para modificar o
 eliminar registros de auditoría.
+
+Tanto los registros completos como `activity` de `GET /dashboard` incluyen `actor.avatarUrl`
+(nullable) para representar al usuario; el cliente debe usar sus iniciales cuando no exista imagen.
 
 ## Contrato de creación de expediente
 
